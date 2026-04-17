@@ -29,8 +29,61 @@ export const login = async (payload) => {
   return data;
 };
 
+export const fetchAdminDashboard = async (token) => {
+  const { data } = await api.get('/admin/dashboard', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const updateSection = async (key, payload, token) => {
+  const { data } = await api.put(`/admin/sections/${key}`, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const createService = async (payload, token) => {
+  const { data } = await api.post('/admin/services', payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
 export const updateService = async (id, payload, token) => {
   const { data } = await api.put(`/admin/services/${id}`, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const deleteService = async (id, token) => {
+  const { data } = await api.delete(`/admin/services/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const approveTestimonial = async (id, token) => {
+  const { data } = await api.patch(
+    `/admin/testimonials/${id}/approve`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${token}` }
+    }
+  );
+  return data;
+};
+
+export const deleteTestimonial = async (id, token) => {
+  const { data } = await api.delete(`/admin/testimonials/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const createReviewCode = async (payload, token) => {
+  const { data } = await api.post('/admin/review-codes', payload, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return data;

@@ -1,17 +1,15 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { env } from './config/env.js';
 import authRoutes from './routes/authRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-
-dotenv.config();
 
 const app = express();
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173'
+    origin: env.FRONTEND_URL
   })
 );
 app.use(express.json());
@@ -29,7 +27,7 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ message: 'Error interno del servidor.' });
 });
 
-const port = Number(process.env.PORT || 4000);
+const port = env.PORT;
 app.listen(port, () => {
   console.log(`API Matrona ejecutándose en http://localhost:${port}`);
 });
