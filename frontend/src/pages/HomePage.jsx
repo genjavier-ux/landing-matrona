@@ -58,7 +58,7 @@ export default function HomePage() {
           </nav>
         </header>
 
-        <section className="hero card">
+        <section className="hero">
           <div className="hero-copy">
             <span className="eyebrow">Matrona en Chile</span>
             <h1>{content?.hero?.title || 'Matrona Contigo'}</h1>
@@ -79,7 +79,7 @@ export default function HomePage() {
         </section>
       </section>
 
-      <section id="servicios" className="card section-card">
+      <section id="servicios" className="flow-section">
         <h2>Servicios</h2>
         <p className="section-lead">Atención integral con enfoque humano, respetuoso y actualizado.</p>
         <div className="grid">
@@ -93,7 +93,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="comentarios" className="card section-card">
+      <section id="comentarios" className="flow-section">
         <h2>Comentarios de pacientes</h2>
         <ul className="testimonial-list">
           {content?.testimonials?.map((item) => (
@@ -130,7 +130,7 @@ export default function HomePage() {
         </form>
       </section>
 
-      <section id="contacto" className="card section-card">
+      <section id="contacto" className="flow-section">
         <h2>Contacto</h2>
         <form onSubmit={handleSubmitContact} className="stack-form">
           <input
@@ -161,7 +161,7 @@ export default function HomePage() {
         </form>
       </section>
 
-      <section className="card section-card">
+      <section className="flow-section">
         <h2>Suscríbete a novedades</h2>
         <p className="section-lead">Recibe consejos, talleres y contenidos educativos para tu etapa.</p>
         <form onSubmit={handleSubscribe} className="inline-form">
@@ -170,7 +170,7 @@ export default function HomePage() {
         </form>
       </section>
 
-      <section className="card section-card">
+      <section className="flow-section">
         <h2>Redes sociales</h2>
         <p className="section-lead">Contenido educativo para matronas, mamás y familias.</p>
         <div className="social-links">

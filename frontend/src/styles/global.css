@@ -4,7 +4,7 @@
   background:
     radial-gradient(circle at 15% 8%, #ffe0ea 0, #ffe0ea 14%, transparent 15%),
     radial-gradient(circle at 85% 20%, #ffd8e6 0, #ffd8e6 10%, transparent 11%),
-    linear-gradient(180deg, #fff5f9 0%, #fff 44%);
+    linear-gradient(180deg, #fff3f8 0%, #fff6f9 30%, #fff 62%, #fff7fa 100%);
   line-height: 1.5;
 }
 
@@ -27,15 +27,16 @@ h3 {
 .layout {
   width: min(1100px, 92%);
   margin: 0 auto;
-  padding: 2.2rem 0 3.2rem;
+  padding: 1.2rem 0 3rem;
   display: grid;
-  gap: 1.3rem;
+  gap: 0;
 }
 
 .hero-shell {
-  border-radius: 1.5rem;
+  border-radius: 1.7rem;
   overflow: hidden;
-  box-shadow: 0 20px 48px rgba(173, 46, 87, 0.19);
+  box-shadow: 0 28px 60px rgba(173, 46, 87, 0.2);
+  margin-bottom: 1rem;
 }
 
 .topbar {
@@ -82,19 +83,10 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.55);
 }
 
-.card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #ffd4df;
-  border-radius: 1.1rem;
-  padding: 1.35rem;
-  box-shadow: 0 14px 30px rgba(217, 75, 112, 0.12);
-  backdrop-filter: blur(3px);
-}
-
 .hero {
   background: linear-gradient(135deg, #d94b70 0%, #e76b92 55%, #f6a6b9 100%);
   color: white;
-  padding: 2rem 1.45rem 1.8rem;
+  padding: 2.2rem 1.45rem 2rem;
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   align-items: center;
@@ -119,7 +111,7 @@ h3 {
 }
 
 .hero-visual {
-  min-height: 240px;
+  min-height: 260px;
   position: relative;
   isolation: isolate;
 }
@@ -208,26 +200,45 @@ button:hover,
   background: rgba(255, 255, 255, 0.2);
 }
 
-.section-card h2 {
-  margin-bottom: 0.35rem;
-}
-
 .section-lead {
   margin: 0 0 0.95rem;
   color: #7b4359;
 }
 
+.flow-section {
+  padding: 2rem 0.3rem;
+  position: relative;
+}
+
+.flow-section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #f5cada 18%, #f5cada 82%, transparent 100%);
+}
+
+.flow-section:last-of-type::after {
+  display: none;
+}
+
+.flow-section h2 {
+  font-size: clamp(1.6rem, 2.7vw, 2.2rem);
+}
+
 .grid {
   display: grid;
-  gap: 1.05rem;
+  gap: 1.2rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .service-card {
-  background: #fffafc;
+  background: linear-gradient(180deg, #fff 0%, #fff8fb 100%);
   border: 1px solid #ffd7e2;
-  border-radius: 0.95rem;
-  padding: 0.75rem;
+  border-radius: 1.1rem;
+  padding: 0.9rem;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
@@ -253,10 +264,10 @@ button:hover,
 }
 
 .testimonial-list li {
-  border-left: 4px solid #e76b92;
-  background: #fff8fb;
-  border-radius: 0.55rem;
-  padding: 0.62rem 0.76rem;
+  border: 1px solid #f5c8d8;
+  background: linear-gradient(110deg, #fff8fb 0%, #fff 100%);
+  border-radius: 0.85rem;
+  padding: 0.72rem 0.84rem;
 }
 
 .stack-form {
@@ -299,7 +310,7 @@ textarea:focus {
   border: 1px solid #f2bfd0;
   border-radius: 999px;
   padding: 0.4rem 0.75rem;
-  background: #fff7fa;
+  background: linear-gradient(180deg, #fff7fa, #fff);
 }
 
 .social-links a:hover {
@@ -312,12 +323,13 @@ textarea:focus {
   color: #932845;
   border-radius: 0.6rem;
   padding: 0.75rem;
+  margin-top: 1rem;
 }
 
 @media (max-width: 700px) {
   .layout {
     width: min(1120px, 94%);
-    padding-top: 1.4rem;
+    padding-top: 0.9rem;
   }
 
   .topbar {
@@ -332,6 +344,10 @@ textarea:focus {
 
   .hero-visual {
     min-height: 170px;
+  }
+
+  .flow-section {
+    padding: 1.5rem 0.2rem;
   }
 
   .inline-form {
