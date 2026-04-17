@@ -62,6 +62,11 @@ export default function HomePage() {
 
   useEffect(() => {
     const sections = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window)) {
+      sections.forEach((section) => section.classList.add('visible'));
+      return undefined;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
