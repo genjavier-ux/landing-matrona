@@ -1,261 +1,615 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  approveTestimonial,
+  createAdminTestimonial,
   createService,
-  createReviewCode,
   deleteService,
   deleteTestimonial,
   fetchAdminDashboard,
-  login,
+  updateAdminTestimonial,
   updateSection,
-  updateService
+  updateService,
+  updateWeeklyAvailability
 } from '../services/api';
 
-const tokenStorageKey = 'matrona_admin_token';
+const adminTabs = [
+  { id: 'pages', label: 'Paginas' },
+  { id: 'booking', label: 'Horarios' },
+  { id: 'services', label: 'Servicios' },
+  { id: 'testimonials', label: 'Testimonios' }
+];
 
-const initialCredentials = { email: '', password: '' };
-const initialHero = { title: '', content: '' };
-const initialCodeForm = { code: '', expiresAt: '' };
-const initialService = { title: '', description: '', imageUrl: '' };
+const bookingDays = [
+  { dayOfWeek: 0, label: 'Domingo', shortLabel: 'Dom' },
+  { dayOfWeek: 1, label: 'Lunes', shortLabel: 'Lun' },
+  { dayOfWeek: 2, label: 'Martes', shortLabel: 'Mar' },
+  { dayOfWeek: 3, label: 'Miercoles', shortLabel: 'Mie' },
+  { dayOfWeek: 4, label: 'Jueves', shortLabel: 'Jue' },
+  { dayOfWeek: 5, label: 'Viernes', shortLabel: 'Vie' },
+  { dayOfWeek: 6, label: 'Sabado', shortLabel: 'Sab' }
+];
 
-function getErrorMessage(error, fallback) {
-  return error?.response?.data?.message || fallback;
-}
-
-function formatDate(value) {
-  if (!value) return 'Sin fecha';
-
-  try {
-    return new Intl.DateTimeFormat('es-CL', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(new Date(value));
-  } catch {
-    return value;
+const editableSections = [
+  {
+    key: 'hero',
+    label: 'Inicio',
+    description: 'Titulo y texto principal del hero de la landing.'
+  },
+  {
+    key: 'about',
+    label: 'Sobre mi',
+    description: 'Presentacion editable para la pagina sobre mi.'
+  },
+  {
+    key: 'services',
+    label: 'Servicios',
+    description: 'Encabezado e introduccion de la pagina de servicios.'
+  },
+  {
+    key: 'comments',
+    label: 'Comentarios',
+    description: 'Titulo y texto de apoyo de la pagina de testimonios.'
+  },
+  {
+    key: 'contact',
+    label: 'Contacto',
+    description: 'Texto introductorio de la pagina de contacto.'
+  },
+  {
+    key: 'booking',
+    label: 'Reservar hora',
+    description: 'Texto principal que acompana la agenda online.'
   }
-}
+];
+
+const defaultSectionContent = {
+  hero: {
+    title: 'Atencion medica clara, cercana y sin friccion',
+    content: 'Reserva tu hora y navega por la pagina con una experiencia limpia, abierta y continua.'
+  },
+  about: {
+    title: 'Sobre mi',
+    content:
+      'Acompanamiento profesional con una mirada cercana, clara y humana en cada etapa de la atencion.'
+  },
+  services: {
+    title: 'Servicios',
+    content: 'Explora prestaciones pensadas para seguimiento, orientacion y cuidado continuo.'
+  },
+  comments: {
+    title: 'Testimonios',
+    content: 'Comentarios reales de pacientes sobre su experiencia de atencion.'
+  },
+  contact: {
+    title: 'Contacto',
+    content: 'Escribenos para resolver dudas, solicitar informacion o coordinar tu atencion.'
+  },
+  booking: {
+    title: 'Agenda tu atencion',
+    content:
+      'Selecciona el dia y luego una hora disponible en un calendario visual conectado a la agenda real.'
+  }
+};
+
+const durationOptions = [30, 45, 60, 90, 120];
+const testimonialStatusOptions = ['pending', 'approved', 'rejected'];
+
+const initialServiceForm = {
+  title: '',
+  description: '',
+  price: '0',
+  currency: 'CLP',
+  durationMinutes: '60',
+  imageUrl: '',
+  isActive: true,
+  orderIndex: '0'
+};
+
+const initialTestimonialForm = {
+  patientNameAlias: '',
+  content: '',
+  rating: '5',
+  status: 'approved',
+  isVisible: true
+};
+
+const normalizeWeeklyAvailability = (rows = []) => {
+  const rowMap = new Map(rows.map((item) => [Number(item.dayOfWeek), item]));
+
+  return bookingDays.map((day) => {
+    const row = rowMap.get(day.dayOfWeek);
+
+    return {
+      dayOfWeek: day.dayOfWeek,
+      label: day.label,
+      shortLabel: day.shortLabel,
+      isEnabled: Boolean(row?.isEnabled),
+      startTime: row?.startTime ? String(row.startTime).slice(0, 5) : '08:00',
+      endTime: row?.endTime ? String(row.endTime).slice(0, 5) : '17:00',
+      slotMinutes: Number(row?.slotMinutes || 60)
+    };
+  });
+};
+
+const normalizeSections = (rows = []) => {
+  const rowMap = new Map(rows.map((item) => [item.key, item]));
+
+  return editableSections.map((section) => {
+    const row = rowMap.get(section.key);
+    const fallback = defaultSectionContent[section.key];
+
+    return {
+      ...section,
+      title: row?.title || fallback.title,
+      content: row?.content || fallback.content
+    };
+  });
+};
+
+const normalizeServices = (rows = []) =>
+  rows.map((service) => ({
+    ...service,
+    price: String(service.price ?? '0'),
+    currency: service.currency || 'CLP',
+    durationMinutes: String(service.durationMinutes ?? 60),
+    imageUrl: service.imageUrl || '',
+    isActive: Boolean(service.isActive),
+    orderIndex: String(service.orderIndex ?? 0)
+  }));
+
+const normalizeTestimonials = (rows = []) =>
+  rows.map((item) => ({
+    ...item,
+    rating: String(item.rating ?? 5),
+    status: item.status || 'pending',
+    isVisible: Boolean(item.isVisible)
+  }));
+
+const getErrorMessage = (error, fallback) => error.response?.data?.message || fallback;
 
 export default function AdminPage() {
-  const [credentials, setCredentials] = useState(initialCredentials);
-  const [token, setToken] = useState(() => localStorage.getItem(tokenStorageKey) || '');
+  const navigate = useNavigate();
+  const token = window.localStorage.getItem('matrona-token');
+
+  const [activeTab, setActiveTab] = useState('pages');
   const [dashboard, setDashboard] = useState(null);
-  const [heroForm, setHeroForm] = useState(initialHero);
+  const [pageSections, setPageSections] = useState(normalizeSections());
+  const [bookingSettings, setBookingSettings] = useState(normalizeWeeklyAvailability());
   const [services, setServices] = useState([]);
-  const [newServiceForm, setNewServiceForm] = useState(initialService);
-  const [codeForm, setCodeForm] = useState(initialCodeForm);
-  const [message, setMessage] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isLoadingDashboard, setIsLoadingDashboard] = useState(Boolean(token));
+  const [newServiceForm, setNewServiceForm] = useState(initialServiceForm);
+  const [testimonials, setTestimonials] = useState([]);
+  const [newTestimonialForm, setNewTestimonialForm] = useState(initialTestimonialForm);
+  const [pageStatus, setPageStatus] = useState({ type: '', message: '' });
+  const [bookingStatus, setBookingStatus] = useState({ type: '', message: '' });
+  const [serviceStatus, setServiceStatus] = useState({ type: '', message: '' });
+  const [testimonialStatus, setTestimonialStatus] = useState({ type: '', message: '' });
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
 
-  const hydrateDashboard = async (authToken) => {
-    setIsLoadingDashboard(true);
+  const applyDashboard = (response) => {
+    setDashboard(response);
+    setPageSections(normalizeSections(response.sections));
+    setBookingSettings(normalizeWeeklyAvailability(response.weeklyAvailability));
+    setServices(normalizeServices(response.services));
+    setTestimonials(normalizeTestimonials(response.testimonials));
+  };
 
-    try {
-      const data = await fetchAdminDashboard(authToken);
-      const heroSection = data.sections.find((section) => section.key === 'hero');
-
-      setDashboard(data);
-      setHeroForm({
-        title: heroSection?.title || '',
-        content: heroSection?.content || ''
-      });
-      setServices(
-        data.services.map((service) => ({
-          ...service,
-          imageUrl: service.imageUrl || ''
-        }))
-      );
-    } catch (error) {
-      if (error?.response?.status === 401) {
-        localStorage.removeItem(tokenStorageKey);
-        setToken('');
-        setDashboard(null);
-        setMessage('Tu sesion expiro. Vuelve a iniciar sesion.');
-      } else {
-        setMessage(getErrorMessage(error, 'No se pudo cargar el panel admin.'));
-      }
-    } finally {
-      setIsLoadingDashboard(false);
+  const handleUnauthorized = (error) => {
+    if (error?.response?.status === 401) {
+      window.localStorage.removeItem('matrona-token');
+      navigate('/login', { replace: true });
+      return true;
     }
+
+    return false;
+  };
+
+  const refreshDashboard = async (authToken) => {
+    const response = await fetchAdminDashboard(authToken);
+    applyDashboard(response);
+    return response;
   };
 
   useEffect(() => {
     if (!token) {
-      setDashboard(null);
-      setHeroForm(initialHero);
-      setServices([]);
+      setIsLoading(false);
       return;
     }
 
-    hydrateDashboard(token);
-  }, [token]);
+    let isMounted = true;
 
-  const handleLogin = async (event) => {
-    event.preventDefault();
-    setIsLoggingIn(true);
+    const loadDashboard = async () => {
+      try {
+        const response = await fetchAdminDashboard(token);
+        if (isMounted) {
+          applyDashboard(response);
+          setErrorMessage('');
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
 
-    try {
-      const response = await login(credentials);
-      localStorage.setItem(tokenStorageKey, response.token);
-      setToken(response.token);
-      setCredentials(initialCredentials);
-      setMessage('Sesion iniciada. Ya puedes editar la landing.');
-    } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo iniciar sesion.'));
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
+        if (!handleUnauthorized(error)) {
+          setErrorMessage(getErrorMessage(error, 'No fue posible cargar el dashboard.'));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, token]);
 
   const handleLogout = () => {
-    localStorage.removeItem(tokenStorageKey);
-    setToken('');
-    setDashboard(null);
-    setHeroForm(initialHero);
-    setServices([]);
-    setNewServiceForm(initialService);
-    setCodeForm(initialCodeForm);
-    setMessage('Sesion cerrada.');
+    window.localStorage.removeItem('matrona-token');
+    navigate('/login', { replace: true });
   };
 
-  const handleHeroUpdate = async (event) => {
-    event.preventDefault();
-    setBusyAction('hero');
+  const handleSectionFieldChange = (key, field, value) => {
+    setPageSections((currentValue) =>
+      currentValue.map((item) => (item.key === key ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleSaveSection = async (key) => {
+    const section = pageSections.find((item) => item.key === key);
+    if (!section) {
+      return;
+    }
+
+    setBusyAction(`section:${key}`);
+    setPageStatus({ type: '', message: '' });
 
     try {
-      await updateSection('hero', heroForm, token);
-      setMessage('Hero actualizado correctamente.');
-      await hydrateDashboard(token);
+      const response = await updateSection(
+        key,
+        {
+          title: section.title,
+          content: section.content
+        },
+        token
+      );
+      await refreshDashboard(token);
+      setPageStatus({
+        type: 'success',
+        message: response.message || `Seccion ${section.label} actualizada.`
+      });
     } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo actualizar el hero.'));
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setPageStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible guardar la pagina.')
+      });
     } finally {
       setBusyAction('');
     }
   };
 
-  const handleServiceChange = (serviceId, field, value) => {
-    setServices((prev) =>
-      prev.map((service) =>
-        service.id === serviceId ? { ...service, [field]: value } : service
+  const handleBookingFieldChange = (dayOfWeek, key, value) => {
+    setBookingSettings((currentValue) =>
+      currentValue.map((item) =>
+        item.dayOfWeek === dayOfWeek
+          ? {
+              ...item,
+              [key]: key === 'isEnabled' ? value : value
+            }
+          : item
       )
     );
   };
 
-  const handleServiceUpdate = async (event, serviceId) => {
-    event.preventDefault();
-    const service = services.find((item) => item.id === serviceId);
-    if (!service) return;
+  const handleSaveBooking = async () => {
+    const invalidRow = bookingSettings.find(
+      (item) => item.isEnabled && (!item.startTime || !item.endTime || item.startTime >= item.endTime)
+    );
 
-    setBusyAction(`service-${serviceId}`);
+    if (invalidRow) {
+      setBookingStatus({
+        type: 'error',
+        message: `Revisa el horario configurado para ${invalidRow.label}.`
+      });
+      return;
+    }
+
+    setBusyAction('booking');
+    setBookingStatus({ type: '', message: '' });
 
     try {
-      await updateService(
-        serviceId,
-        {
-          title: service.title,
-          description: service.description,
-          imageUrl: service.imageUrl
-        },
-        token
-      );
-      setMessage(`Servicio ${serviceId} actualizado correctamente.`);
-      await hydrateDashboard(token);
+      const payload = {
+        availability: bookingSettings.map((item) => ({
+          dayOfWeek: item.dayOfWeek,
+          isEnabled: item.isEnabled,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          slotMinutes: Number(item.slotMinutes)
+        }))
+      };
+
+      const response = await updateWeeklyAvailability(payload, token);
+      await refreshDashboard(token);
+      setBookingStatus({
+        type: 'success',
+        message: response.message || 'Configuracion del booking guardada.'
+      });
     } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo actualizar el servicio.'));
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setBookingStatus({
+        type: 'error',
+        message:
+          getErrorMessage(error, 'No fue posible guardar la configuracion del booking.')
+      });
     } finally {
       setBusyAction('');
     }
   };
 
-  const handleCreateService = async (event) => {
-    event.preventDefault();
+  const handleNewServiceChange = (field, value) => {
+    setNewServiceForm((currentValue) => ({
+      ...currentValue,
+      [field]: value
+    }));
+  };
+
+  const handleServiceFieldChange = (serviceId, field, value) => {
+    setServices((currentValue) =>
+      currentValue.map((service) =>
+        service.id === serviceId
+          ? {
+              ...service,
+              [field]: value
+            }
+          : service
+      )
+    );
+  };
+
+  const handleCreateService = async () => {
+    if (!newServiceForm.title || !newServiceForm.description) {
+      setServiceStatus({
+        type: 'error',
+        message: 'El servicio requiere titulo y descripcion.'
+      });
+      return;
+    }
+
     setBusyAction('create-service');
+    setServiceStatus({ type: '', message: '' });
 
     try {
-      await createService(
+      const response = await createService(
         {
-          title: newServiceForm.title,
-          description: newServiceForm.description,
-          imageUrl: newServiceForm.imageUrl
+          ...newServiceForm,
+          price: Number(newServiceForm.price || 0),
+          durationMinutes: Number(newServiceForm.durationMinutes || 60),
+          orderIndex: Number(newServiceForm.orderIndex || 0)
         },
         token
       );
-      setNewServiceForm(initialService);
-      setMessage('Nuevo servicio creado correctamente.');
-      await hydrateDashboard(token);
+      setNewServiceForm(initialServiceForm);
+      await refreshDashboard(token);
+      setServiceStatus({
+        type: 'success',
+        message: response.message || 'Servicio creado.'
+      });
     } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo crear el servicio.'));
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setServiceStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible crear el servicio.')
+      });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleSaveService = async (serviceId) => {
+    const service = services.find((item) => item.id === serviceId);
+    if (!service) {
+      return;
+    }
+
+    setBusyAction(`service:${serviceId}`);
+    setServiceStatus({ type: '', message: '' });
+
+    try {
+      const response = await updateService(
+        serviceId,
+        {
+          ...service,
+          price: Number(service.price || 0),
+          durationMinutes: Number(service.durationMinutes || 60),
+          orderIndex: Number(service.orderIndex || 0)
+        },
+        token
+      );
+      await refreshDashboard(token);
+      setServiceStatus({
+        type: 'success',
+        message: response.message || 'Servicio actualizado.'
+      });
+    } catch (error) {
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setServiceStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible actualizar el servicio.')
+      });
     } finally {
       setBusyAction('');
     }
   };
 
   const handleDeleteService = async (serviceId) => {
-    const shouldDelete = window.confirm(
-      'Este servicio se eliminara de la landing. ¿Quieres continuar?'
+    const shouldDelete = window.confirm('Este servicio se eliminara de la pagina. Quieres continuar?');
+    if (!shouldDelete) {
+      return;
+    }
+
+    setBusyAction(`delete-service:${serviceId}`);
+    setServiceStatus({ type: '', message: '' });
+
+    try {
+      const response = await deleteService(serviceId, token);
+      await refreshDashboard(token);
+      setServiceStatus({
+        type: 'success',
+        message: response.message || 'Servicio eliminado.'
+      });
+    } catch (error) {
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setServiceStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible eliminar el servicio.')
+      });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleNewTestimonialChange = (field, value) => {
+    setNewTestimonialForm((currentValue) => ({
+      ...currentValue,
+      [field]: value
+    }));
+  };
+
+  const handleTestimonialFieldChange = (testimonialId, field, value) => {
+    setTestimonials((currentValue) =>
+      currentValue.map((item) =>
+        item.id === testimonialId
+          ? {
+              ...item,
+              [field]: value
+            }
+          : item
+      )
     );
-
-    if (!shouldDelete) return;
-
-    setBusyAction(`delete-service-${serviceId}`);
-
-    try {
-      await deleteService(serviceId, token);
-      setMessage(`Servicio ${serviceId} eliminado.`);
-      await hydrateDashboard(token);
-    } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo eliminar el servicio.'));
-    } finally {
-      setBusyAction('');
-    }
   };
 
-  const handleApprove = async (testimonialId) => {
-    setBusyAction(`approve-${testimonialId}`);
-
-    try {
-      await approveTestimonial(testimonialId, token);
-      setMessage('Comentario aprobado.');
-      await hydrateDashboard(token);
-    } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo aprobar el comentario.'));
-    } finally {
-      setBusyAction('');
+  const handleCreateTestimonial = async () => {
+    if (!newTestimonialForm.patientNameAlias || !newTestimonialForm.content) {
+      setTestimonialStatus({
+        type: 'error',
+        message: 'El comentario requiere alias y contenido.'
+      });
+      return;
     }
-  };
 
-  const handleDelete = async (testimonialId) => {
-    setBusyAction(`delete-${testimonialId}`);
-
-    try {
-      await deleteTestimonial(testimonialId, token);
-      setMessage('Comentario eliminado.');
-      await hydrateDashboard(token);
-    } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo eliminar el comentario.'));
-    } finally {
-      setBusyAction('');
-    }
-  };
-
-  const handleReviewCodeCreate = async (event) => {
-    event.preventDefault();
-    setBusyAction('review-code');
+    setBusyAction('create-testimonial');
+    setTestimonialStatus({ type: '', message: '' });
 
     try {
-      await createReviewCode(
+      const response = await createAdminTestimonial(
         {
-          code: codeForm.code.trim(),
-          expiresAt: codeForm.expiresAt || null
+          ...newTestimonialForm,
+          rating: Number(newTestimonialForm.rating || 5)
         },
         token
       );
-      setCodeForm(initialCodeForm);
-      setMessage('Codigo creado correctamente.');
-      await hydrateDashboard(token);
+      setNewTestimonialForm(initialTestimonialForm);
+      await refreshDashboard(token);
+      setTestimonialStatus({
+        type: 'success',
+        message: response.message || 'Comentario creado.'
+      });
     } catch (error) {
-      setMessage(getErrorMessage(error, 'No se pudo crear el codigo.'));
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setTestimonialStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible crear el comentario.')
+      });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleSaveTestimonial = async (testimonialId) => {
+    const testimonial = testimonials.find((item) => item.id === testimonialId);
+    if (!testimonial) {
+      return;
+    }
+
+    setBusyAction(`testimonial:${testimonialId}`);
+    setTestimonialStatus({ type: '', message: '' });
+
+    try {
+      const response = await updateAdminTestimonial(
+        testimonialId,
+        {
+          ...testimonial,
+          rating: Number(testimonial.rating || 5)
+        },
+        token
+      );
+      await refreshDashboard(token);
+      setTestimonialStatus({
+        type: 'success',
+        message: response.message || 'Comentario actualizado.'
+      });
+    } catch (error) {
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setTestimonialStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible actualizar el comentario.')
+      });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleDeleteTestimonial = async (testimonialId) => {
+    const shouldDelete = window.confirm('Este comentario se eliminara. Quieres continuar?');
+    if (!shouldDelete) {
+      return;
+    }
+
+    setBusyAction(`delete-testimonial:${testimonialId}`);
+    setTestimonialStatus({ type: '', message: '' });
+
+    try {
+      const response = await deleteTestimonial(testimonialId, token);
+      await refreshDashboard(token);
+      setTestimonialStatus({
+        type: 'success',
+        message: response.message || 'Comentario eliminado.'
+      });
+    } catch (error) {
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      setTestimonialStatus({
+        type: 'error',
+        message: getErrorMessage(error, 'No fue posible eliminar el comentario.')
+      });
     } finally {
       setBusyAction('');
     }
@@ -263,295 +617,675 @@ export default function AdminPage() {
 
   if (!token) {
     return (
-      <main className="layout admin-shell">
-        <section className="card admin-auth-card">
-          <span className="section-kicker">Acceso admin</span>
-          <h1>Inicia sesion para ver las pantallas editables</h1>
-          <p className="section-lead">
-            Al entrar veras el panel para editar hero, servicios, comentarios y codigos.
-          </p>
-
-          <form onSubmit={handleLogin} className="stack-form">
-            <input
-              required
-              type="text"
-              placeholder="admin@matrona.cl"
-              value={credentials.email}
-              onChange={(event) =>
-                setCredentials((prev) => ({ ...prev, email: event.target.value }))
-              }
-            />
-            <input
-              required
-              type="password"
-              placeholder="Contrasena"
-              value={credentials.password}
-              onChange={(event) =>
-                setCredentials((prev) => ({ ...prev, password: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={isLoggingIn}>
-              {isLoggingIn ? 'Ingresando...' : 'Iniciar sesion'}
-            </button>
-          </form>
-
-          {message && <p className="notice">{message}</p>}
-        </section>
-      </main>
+      <section className="placeholder-section">
+        <div className="placeholder-card admin-empty">
+          <span className="section-tag">Panel</span>
+          <h1>Necesitas iniciar sesion</h1>
+          <Link to="/login" className="button button-primary">
+            Ir a login
+          </Link>
+        </div>
+      </section>
     );
   }
-
-  if (isLoadingDashboard && !dashboard) {
-    return (
-      <main className="layout admin-shell">
-        <section className="card admin-card">
-          <span className="section-kicker">Panel admin</span>
-          <h1>Cargando pantallas editables...</h1>
-          <p className="section-lead">Estamos preparando el contenido para editar.</p>
-        </section>
-      </main>
-    );
-  }
-
-  const pendingTestimonials =
-    dashboard?.testimonials?.filter((testimonial) => testimonial.status === 'pending') || [];
 
   return (
-    <main className="layout admin-shell">
-      <section className="card admin-toolbar">
+    <section className="admin-page">
+      <div className="admin-header">
         <div>
-          <span className="section-kicker">Panel editable</span>
-          <h1>Landing Matrona</h1>
-          <p className="section-lead">
-            Tras el login ya se muestran las pantallas editables con el contenido actual.
-          </p>
+          <span className="section-tag">Dashboard</span>
+          <h1>Panel administrativo</h1>
         </div>
 
-        <div className="admin-toolbar-actions">
-          <div className="admin-summary">
-            <strong>{services.length}</strong>
-            <span>servicios</span>
-          </div>
-          <div className="admin-summary">
-            <strong>{pendingTestimonials.length}</strong>
-            <span>pendientes</span>
-          </div>
-          <button type="button" onClick={handleLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-      </section>
-
-      <div className="admin-grid">
-        <section className="card admin-card">
-          <span className="section-kicker">Hero editable</span>
-          <h2>Editar portada principal</h2>
-          <form onSubmit={handleHeroUpdate} className="stack-form">
-            <input
-              required
-              placeholder="Titulo principal"
-              value={heroForm.title}
-              onChange={(event) =>
-                setHeroForm((prev) => ({ ...prev, title: event.target.value }))
-              }
-            />
-            <textarea
-              required
-              placeholder="Texto de apoyo"
-              value={heroForm.content}
-              onChange={(event) =>
-                setHeroForm((prev) => ({ ...prev, content: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'hero'}>
-              {busyAction === 'hero' ? 'Guardando...' : 'Guardar hero'}
-            </button>
-          </form>
-        </section>
-
-        <section className="card admin-card">
-          <span className="section-kicker">Codigos</span>
-          <h2>Crear codigo para comentarios</h2>
-          <form onSubmit={handleReviewCodeCreate} className="stack-form">
-            <input
-              required
-              placeholder="Codigo unico"
-              value={codeForm.code}
-              onChange={(event) =>
-                setCodeForm((prev) => ({ ...prev, code: event.target.value }))
-              }
-            />
-            <input
-              type="datetime-local"
-              value={codeForm.expiresAt}
-              onChange={(event) =>
-                setCodeForm((prev) => ({ ...prev, expiresAt: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'review-code'}>
-              {busyAction === 'review-code' ? 'Creando...' : 'Crear codigo'}
-            </button>
-          </form>
-
-          <div className="admin-list">
-            {(dashboard?.reviewCodes || []).map((reviewCode) => (
-              <article key={reviewCode.id} className="admin-list-item">
-                <div>
-                  <strong>{reviewCode.code}</strong>
-                  <p>{formatDate(reviewCode.expiresAt)}</p>
-                </div>
-                <span className={reviewCode.isUsed ? 'status-pill used' : 'status-pill'}>
-                  {reviewCode.isUsed ? 'Usado' : 'Disponible'}
-                </span>
-              </article>
-            ))}
-          </div>
-        </section>
+        <button type="button" className="button button-secondary" onClick={handleLogout}>
+          Cerrar sesion
+        </button>
       </div>
 
-      <section className="admin-section">
-        <div className="admin-section-head">
-          <div>
-            <span className="section-kicker">Servicios</span>
-            <h2>Agrega todos los servicios que quiera mostrar la matrona</h2>
-          </div>
-        </div>
+      {isLoading ? <p className="status-note">Cargando datos del panel...</p> : null}
+      {errorMessage ? <p className="form-status error">{errorMessage}</p> : null}
 
-        <section className="card admin-card admin-create-service">
-          <span className="section-kicker">Nuevo servicio</span>
-          <p className="section-lead">
-            La landing ya no depende de 1 o 3 servicios fijos. Desde aqui puede crear todos los
-            que necesite.
-          </p>
-
-          <form onSubmit={handleCreateService} className="stack-form">
-            <input
-              required
-              placeholder="Titulo del servicio"
-              value={newServiceForm.title}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, title: event.target.value }))
-              }
-            />
-            <textarea
-              required
-              placeholder="Descripcion del servicio"
-              value={newServiceForm.description}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, description: event.target.value }))
-              }
-            />
-            <input
-              placeholder="URL de imagen"
-              value={newServiceForm.imageUrl}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, imageUrl: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'create-service'}>
-              {busyAction === 'create-service' ? 'Creando...' : 'Agregar servicio'}
-            </button>
-          </form>
-        </section>
-
-        <div className="admin-service-grid">
-          {services.map((service) => (
-            <form
-              key={service.id}
-              onSubmit={(event) => handleServiceUpdate(event, service.id)}
-              className="card admin-card stack-form"
-            >
-              <strong className="admin-card-id">Servicio #{service.id}</strong>
-              <input
-                required
-                placeholder="Titulo"
-                value={service.title}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'title', event.target.value)
-                }
-              />
-              <textarea
-                required
-                placeholder="Descripcion"
-                value={service.description}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'description', event.target.value)
-                }
-              />
-              <input
-                placeholder="URL imagen"
-                value={service.imageUrl}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'imageUrl', event.target.value)
-                }
-              />
-              <div className="admin-actions-row">
-                <button type="submit" disabled={busyAction === `service-${service.id}`}>
-                  {busyAction === `service-${service.id}` ? 'Guardando...' : 'Guardar servicio'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteService(service.id)}
-                  disabled={busyAction === `delete-service-${service.id}`}
-                >
-                  {busyAction === `delete-service-${service.id}` ? 'Eliminando...' : 'Eliminar'}
-                </button>
+      {dashboard ? (
+        <div className="admin-shell">
+          <aside className="admin-sidebar">
+            <div className="admin-sidebar-card">
+              <span className="section-tag">Menu</span>
+              <div className="admin-tab-list">
+                {adminTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`admin-tab-button ${activeTab === tab.id ? 'is-active' : ''}`}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            </form>
-          ))}
-        </div>
-      </section>
+            </div>
 
-      <section className="card admin-card">
-        <div className="admin-section-head">
-          <div>
-            <span className="section-kicker">Comentarios</span>
-            <h2>Moderacion</h2>
-          </div>
-        </div>
+            <div className="admin-sidebar-card">
+              <span className="flow-label">Resumen</span>
+              <div className="admin-mini-metrics">
+                <div className="admin-mini-metric">
+                  <strong>{pageSections.length}</strong>
+                  <span>Paginas</span>
+                </div>
+                <div className="admin-mini-metric">
+                  <strong>{services.length}</strong>
+                  <span>Servicios</span>
+                </div>
+                <div className="admin-mini-metric">
+                  <strong>{testimonials.length}</strong>
+                  <span>Testimonios</span>
+                </div>
+              </div>
+            </div>
+          </aside>
 
-        <div className="admin-list">
-          {(dashboard?.testimonials || []).length ? (
-            dashboard.testimonials.map((testimonial) => (
-              <article key={testimonial.id} className="admin-list-item admin-list-item-wide">
-                <div>
-                  <div className="admin-comment-head">
-                    <strong>{testimonial.patientNameAlias}</strong>
-                    <span className={`status-pill ${testimonial.status}`}>
-                      {testimonial.status}
-                    </span>
-                  </div>
-                  <p>{testimonial.content}</p>
-                  <small>{formatDate(testimonial.createdAt)}</small>
+          <div className="admin-content-stack">
+            <div className="admin-grid">
+              <article className="metric-card admin-metric">
+                <strong>{pageSections.length}</strong>
+                <span>Secciones editables</span>
+              </article>
+              <article className="metric-card admin-metric">
+                <strong>{services.length}</strong>
+                <span>Servicios</span>
+              </article>
+              <article className="metric-card admin-metric">
+                <strong>{testimonials.length}</strong>
+                <span>Comentarios</span>
+              </article>
+              <article className="metric-card admin-metric">
+                <strong>{dashboard.appointments?.length || 0}</strong>
+                <span>Reservas recientes</span>
+              </article>
+            </div>
+
+            {activeTab === 'pages' ? (
+              <section className="admin-workspace">
+                <div className="admin-workspace-header">
+                  <span className="section-tag">Paginas</span>
+                  <h2>Contenido editable del sitio</h2>
+                  <p>
+                    Edita los textos principales de inicio, sobre mi, servicios, comentarios,
+                    contacto y reservar hora.
+                  </p>
                 </div>
 
-                <div className="admin-actions-row">
-                  {testimonial.status !== 'approved' && (
-                    <button
-                      type="button"
-                      onClick={() => handleApprove(testimonial.id)}
-                      disabled={busyAction === `approve-${testimonial.id}`}
-                    >
-                      {busyAction === `approve-${testimonial.id}` ? 'Aprobando...' : 'Aprobar'}
-                    </button>
-                  )}
+                {pageStatus.message ? (
+                  <p className={`form-status ${pageStatus.type}`}>{pageStatus.message}</p>
+                ) : null}
+
+                <div className="admin-section-grid">
+                  {pageSections.map((section) => (
+                    <article key={section.key} className="admin-editor-card">
+                      <div className="admin-card-header">
+                        <div>
+                          <strong>{section.label}</strong>
+                          <span>{section.description}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="button button-primary"
+                          disabled={busyAction === `section:${section.key}`}
+                          onClick={() => handleSaveSection(section.key)}
+                        >
+                          {busyAction === `section:${section.key}` ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      </div>
+
+                      <label className="field">
+                        <span>Titulo</span>
+                        <input
+                          type="text"
+                          value={section.title}
+                          onChange={(event) =>
+                            handleSectionFieldChange(section.key, 'title', event.target.value)
+                          }
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>Contenido</span>
+                        <textarea
+                          value={section.content}
+                          rows="5"
+                          onChange={(event) =>
+                            handleSectionFieldChange(section.key, 'content', event.target.value)
+                          }
+                        />
+                      </label>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {activeTab === 'booking' ? (
+              <section className="admin-workspace">
+                <div className="booking-config-header">
+                  <div>
+                    <span className="section-tag">Booking</span>
+                    <h2>Configuracion de agenda</h2>
+                    <p>
+                      Activa los dias de trabajo, define horario de apertura y cierre, y elige la
+                      duracion de cada bloque.
+                    </p>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => handleDelete(testimonial.id)}
-                    disabled={busyAction === `delete-${testimonial.id}`}
+                    className="button button-primary"
+                    onClick={handleSaveBooking}
+                    disabled={busyAction === 'booking'}
                   >
-                    {busyAction === `delete-${testimonial.id}` ? 'Eliminando...' : 'Eliminar'}
+                    {busyAction === 'booking' ? 'Guardando...' : 'Guardar horario'}
                   </button>
                 </div>
-              </article>
-            ))
-          ) : (
-            <p className="section-lead">Todavia no hay comentarios para moderar.</p>
-          )}
-        </div>
-      </section>
 
-      {message && <p className="notice">{message}</p>}
-    </main>
+                {bookingStatus.message ? (
+                  <p className={`form-status ${bookingStatus.type}`}>{bookingStatus.message}</p>
+                ) : null}
+
+                <div className="booking-config-grid">
+                  {bookingSettings.map((day) => (
+                    <article key={day.dayOfWeek} className="booking-config-card">
+                      <div className="booking-config-day">
+                        <div>
+                          <strong>{day.label}</strong>
+                          <span>{day.shortLabel}</span>
+                        </div>
+
+                        <label className="booking-day-toggle">
+                          <input
+                            type="checkbox"
+                            checked={day.isEnabled}
+                            onChange={(event) =>
+                              handleBookingFieldChange(
+                                day.dayOfWeek,
+                                'isEnabled',
+                                event.target.checked
+                              )
+                            }
+                          />
+                          <span>{day.isEnabled ? 'Activo' : 'Cerrado'}</span>
+                        </label>
+                      </div>
+
+                      <div className="booking-config-fields">
+                        <label className="field">
+                          <span>Inicio</span>
+                          <input
+                            type="time"
+                            value={day.startTime}
+                            disabled={!day.isEnabled}
+                            onChange={(event) =>
+                              handleBookingFieldChange(day.dayOfWeek, 'startTime', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>Termino</span>
+                          <input
+                            type="time"
+                            value={day.endTime}
+                            disabled={!day.isEnabled}
+                            onChange={(event) =>
+                              handleBookingFieldChange(day.dayOfWeek, 'endTime', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>Duracion</span>
+                          <select
+                            value={day.slotMinutes}
+                            disabled={!day.isEnabled}
+                            onChange={(event) =>
+                              handleBookingFieldChange(day.dayOfWeek, 'slotMinutes', event.target.value)
+                            }
+                          >
+                            {durationOptions.map((minutes) => (
+                              <option key={minutes} value={minutes}>
+                                {minutes} minutos
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {activeTab === 'services' ? (
+              <section className="admin-workspace">
+                <div className="admin-workspace-header">
+                  <span className="section-tag">Servicios</span>
+                  <h2>CRUD de servicios</h2>
+                  <p>
+                    Crea, edita y elimina servicios. Estos datos se muestran automaticamente en la
+                    pagina publica.
+                  </p>
+                </div>
+
+                {serviceStatus.message ? (
+                  <p className={`form-status ${serviceStatus.type}`}>{serviceStatus.message}</p>
+                ) : null}
+
+                <article className="admin-editor-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <strong>Nuevo servicio</strong>
+                      <span>Agrega un servicio nuevo al catalogo publico.</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      disabled={busyAction === 'create-service'}
+                      onClick={handleCreateService}
+                    >
+                      {busyAction === 'create-service' ? 'Creando...' : 'Crear servicio'}
+                    </button>
+                  </div>
+
+                  <div className="field-grid admin-form-grid">
+                    <label className="field">
+                      <span>Titulo</span>
+                      <input
+                        type="text"
+                        value={newServiceForm.title}
+                        onChange={(event) => handleNewServiceChange('title', event.target.value)}
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Precio</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newServiceForm.price}
+                        onChange={(event) => handleNewServiceChange('price', event.target.value)}
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Duracion</span>
+                      <select
+                        value={newServiceForm.durationMinutes}
+                        onChange={(event) =>
+                          handleNewServiceChange('durationMinutes', event.target.value)
+                        }
+                      >
+                        {durationOptions.map((minutes) => (
+                          <option key={minutes} value={minutes}>
+                            {minutes} minutos
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      <span>Orden</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newServiceForm.orderIndex}
+                        onChange={(event) => handleNewServiceChange('orderIndex', event.target.value)}
+                      />
+                    </label>
+
+                    <label className="field admin-form-span-2">
+                      <span>Imagen URL</span>
+                      <input
+                        type="url"
+                        value={newServiceForm.imageUrl}
+                        onChange={(event) => handleNewServiceChange('imageUrl', event.target.value)}
+                      />
+                    </label>
+
+                    <label className="field admin-form-span-2">
+                      <span>Descripcion</span>
+                      <textarea
+                        rows="4"
+                        value={newServiceForm.description}
+                        onChange={(event) => handleNewServiceChange('description', event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </article>
+
+                <div className="admin-section-grid">
+                  {services.map((service) => (
+                    <article key={service.id} className="admin-editor-card">
+                      <div className="admin-card-header">
+                        <div>
+                          <strong>{service.title}</strong>
+                          <span>ID {service.id}</span>
+                        </div>
+
+                        <div className="admin-card-actions">
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            disabled={busyAction === `service:${service.id}`}
+                            onClick={() => handleSaveService(service.id)}
+                          >
+                            {busyAction === `service:${service.id}` ? 'Guardando...' : 'Guardar'}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            disabled={busyAction === `delete-service:${service.id}`}
+                            onClick={() => handleDeleteService(service.id)}
+                          >
+                            {busyAction === `delete-service:${service.id}` ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="field-grid admin-form-grid">
+                        <label className="field">
+                          <span>Titulo</span>
+                          <input
+                            type="text"
+                            value={service.title}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'title', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>Precio</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={service.price}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'price', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>Duracion</span>
+                          <select
+                            value={service.durationMinutes}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'durationMinutes', event.target.value)
+                            }
+                          >
+                            {durationOptions.map((minutes) => (
+                              <option key={minutes} value={minutes}>
+                                {minutes} minutos
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="field">
+                          <span>Orden</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={service.orderIndex}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'orderIndex', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field admin-form-span-2">
+                          <span>Imagen URL</span>
+                          <input
+                            type="url"
+                            value={service.imageUrl}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'imageUrl', event.target.value)
+                            }
+                          />
+                        </label>
+
+                        <label className="field admin-inline-field">
+                          <span>Activo</span>
+                          <input
+                            type="checkbox"
+                            checked={service.isActive}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'isActive', event.target.checked)
+                            }
+                          />
+                        </label>
+
+                        <label className="field admin-form-span-2">
+                          <span>Descripcion</span>
+                          <textarea
+                            rows="4"
+                            value={service.description}
+                            onChange={(event) =>
+                              handleServiceFieldChange(service.id, 'description', event.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {activeTab === 'testimonials' ? (
+              <section className="admin-workspace">
+                <div className="admin-workspace-header">
+                  <span className="section-tag">Testimonios</span>
+                  <h2>CRUD de comentarios</h2>
+                  <p>
+                    Crea testimonios manualmente, edita contenido, controla visibilidad y elimina
+                    comentarios desde el panel.
+                  </p>
+                </div>
+
+                {testimonialStatus.message ? (
+                  <p className={`form-status ${testimonialStatus.type}`}>{testimonialStatus.message}</p>
+                ) : null}
+
+                <article className="admin-editor-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <strong>Nuevo comentario</strong>
+                      <span>Agrega un testimonio manual desde el panel.</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      disabled={busyAction === 'create-testimonial'}
+                      onClick={handleCreateTestimonial}
+                    >
+                      {busyAction === 'create-testimonial' ? 'Creando...' : 'Crear comentario'}
+                    </button>
+                  </div>
+
+                  <div className="field-grid admin-form-grid">
+                    <label className="field">
+                      <span>Alias</span>
+                      <input
+                        type="text"
+                        value={newTestimonialForm.patientNameAlias}
+                        onChange={(event) =>
+                          handleNewTestimonialChange('patientNameAlias', event.target.value)
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Puntuacion</span>
+                      <select
+                        value={newTestimonialForm.rating}
+                        onChange={(event) => handleNewTestimonialChange('rating', event.target.value)}
+                      >
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <option key={rating} value={rating}>
+                            {rating} estrellas
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      <span>Estado</span>
+                      <select
+                        value={newTestimonialForm.status}
+                        onChange={(event) => handleNewTestimonialChange('status', event.target.value)}
+                      >
+                        {testimonialStatusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="field admin-inline-field">
+                      <span>Visible</span>
+                      <input
+                        type="checkbox"
+                        checked={newTestimonialForm.isVisible}
+                        onChange={(event) =>
+                          handleNewTestimonialChange('isVisible', event.target.checked)
+                        }
+                      />
+                    </label>
+
+                    <label className="field admin-form-span-2">
+                      <span>Contenido</span>
+                      <textarea
+                        rows="4"
+                        value={newTestimonialForm.content}
+                        onChange={(event) => handleNewTestimonialChange('content', event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </article>
+
+                <div className="admin-section-grid">
+                  {testimonials.map((testimonial) => (
+                    <article key={testimonial.id} className="admin-editor-card">
+                      <div className="admin-card-header">
+                        <div>
+                          <strong>{testimonial.patientNameAlias}</strong>
+                          <span>{testimonial.createdAt ? String(testimonial.createdAt) : `ID ${testimonial.id}`}</span>
+                        </div>
+
+                        <div className="admin-card-actions">
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            disabled={busyAction === `testimonial:${testimonial.id}`}
+                            onClick={() => handleSaveTestimonial(testimonial.id)}
+                          >
+                            {busyAction === `testimonial:${testimonial.id}` ? 'Guardando...' : 'Guardar'}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            disabled={busyAction === `delete-testimonial:${testimonial.id}`}
+                            onClick={() => handleDeleteTestimonial(testimonial.id)}
+                          >
+                            {busyAction === `delete-testimonial:${testimonial.id}` ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="field-grid admin-form-grid">
+                        <label className="field">
+                          <span>Alias</span>
+                          <input
+                            type="text"
+                            value={testimonial.patientNameAlias}
+                            onChange={(event) =>
+                              handleTestimonialFieldChange(
+                                testimonial.id,
+                                'patientNameAlias',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>Puntuacion</span>
+                          <select
+                            value={testimonial.rating}
+                            onChange={(event) =>
+                              handleTestimonialFieldChange(testimonial.id, 'rating', event.target.value)
+                            }
+                          >
+                            {[1, 2, 3, 4, 5].map((rating) => (
+                              <option key={rating} value={rating}>
+                                {rating} estrellas
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="field">
+                          <span>Estado</span>
+                          <select
+                            value={testimonial.status}
+                            onChange={(event) =>
+                              handleTestimonialFieldChange(testimonial.id, 'status', event.target.value)
+                            }
+                          >
+                            {testimonialStatusOptions.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="field admin-inline-field">
+                          <span>Visible</span>
+                          <input
+                            type="checkbox"
+                            checked={testimonial.isVisible}
+                            onChange={(event) =>
+                              handleTestimonialFieldChange(
+                                testimonial.id,
+                                'isVisible',
+                                event.target.checked
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="field admin-form-span-2">
+                          <span>Contenido</span>
+                          <textarea
+                            rows="4"
+                            value={testimonial.content}
+                            onChange={(event) =>
+                              handleTestimonialFieldChange(testimonial.id, 'content', event.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }

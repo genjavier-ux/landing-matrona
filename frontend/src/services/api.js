@@ -9,8 +9,20 @@ export const fetchPublicContent = async () => {
   return data;
 };
 
+export const fetchAvailabilityByDate = async (date) => {
+  const { data } = await api.get('/public/availability', {
+    params: { date }
+  });
+  return data;
+};
+
 export const sendContact = async (payload) => {
   const { data } = await api.post('/public/contact', payload);
+  return data;
+};
+
+export const createAppointment = async (payload) => {
+  const { data } = await api.post('/public/appointments', payload);
   return data;
 };
 
@@ -31,6 +43,34 @@ export const login = async (payload) => {
 
 export const fetchAdminDashboard = async (token) => {
   const { data } = await api.get('/admin/dashboard', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const fetchAdminAvailability = async (token) => {
+  const { data } = await api.get('/admin/availability', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const updateWeeklyAvailability = async (payload, token) => {
+  const { data } = await api.put('/admin/availability', payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const fetchAdminAppointments = async (token) => {
+  const { data } = await api.get('/admin/appointments', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const updateAppointmentStatus = async (id, payload, token) => {
+  const { data } = await api.patch(`/admin/appointments/${id}/status`, payload, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return data;
@@ -64,6 +104,41 @@ export const deleteService = async (id, token) => {
   return data;
 };
 
+export const createAdminTestimonial = async (payload, token) => {
+  const { data } = await api.post('/admin/testimonials', payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const updateAdminTestimonial = async (id, payload, token) => {
+  const { data } = await api.put(`/admin/testimonials/${id}`, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const createGalleryItem = async (payload, token) => {
+  const { data } = await api.post('/admin/gallery', payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const updateGalleryItem = async (id, payload, token) => {
+  const { data } = await api.put(`/admin/gallery/${id}`, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
+export const deleteGalleryItem = async (id, token) => {
+  const { data } = await api.delete(`/admin/gallery/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return data;
+};
+
 export const approveTestimonial = async (id, token) => {
   const { data } = await api.patch(
     `/admin/testimonials/${id}/approve`,
@@ -72,6 +147,13 @@ export const approveTestimonial = async (id, token) => {
       headers: { Authorization: `Bearer ${token}` }
     }
   );
+  return data;
+};
+
+export const updateTestimonialVisibility = async (id, payload, token) => {
+  const { data } = await api.patch(`/admin/testimonials/${id}/visibility`, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
   return data;
 };
 
