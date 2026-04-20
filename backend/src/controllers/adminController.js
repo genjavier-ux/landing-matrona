@@ -1,25 +1,15 @@
 import { pool } from '../config/db.js';
+import {
+  fetchServicesWithImages,
+  normalizeServiceImagesInput,
+  replaceServiceImages
+} from '../utils/services.js';
 
 export const getDashboard = async (_req, res) => {
   const [sections] = await pool.query(
     'SELECT id, `key`, title, content FROM site_sections ORDER BY id'
   );
-  const [services] = await pool.query(
-    `
-      SELECT
-        id,
-        title,
-        description,
-        price,
-        currency,
-        duration_minutes AS durationMinutes,
-        image_url AS imageUrl,
-        is_active AS isActive,
-        order_index AS orderIndex
-      FROM services
-      ORDER BY order_index, id
-    `
-  );
+  const services = await fetchServicesWithImages();
   const [testimonials] = await pool.query(
     `
       SELECT
@@ -125,102 +115,126 @@ export const updateSection = async (req, res) => {
 };
 
 export const createService = async (req, res) => {
-  const {
-    title,
-    description,
-    imageUrl,
-    price,
-    currency,
-    durationMinutes,
-    isActive,
-    orderIndex
-  } = req.body;
+  const { title, description, price, currency, durationMinutes, isActive, orderIndex, images } =
+    req.body;
 
   if (!title || !description) {
     return res.status(400).json({ message: 'El servicio debe tener titulo y descripcion.' });
   }
 
+  if (Array.isArray(images) && images.length > 10) {
+    return res.status(400).json({ message: 'Cada servicio admite un maximo de 10 imagenes.' });
+  }
+
+  const normalizedImages = normalizeServiceImagesInput(images);
+
   const [[{ nextOrderIndex }]] = await pool.query(
     'SELECT COALESCE(MAX(order_index), 0) + 1 AS nextOrderIndex FROM services'
   );
 
-  const [result] = await pool.query(
-    `
-      INSERT INTO services (
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
+      `
+        INSERT INTO services (
+          title,
+          description,
+          price,
+          currency,
+          duration_minutes,
+          image_url,
+          is_active,
+          order_index
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
         title,
         description,
-        price,
-        currency,
-        duration_minutes,
-        image_url,
-        is_active,
-        order_index
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      title,
-      description,
-      Number(price || 0),
-      currency || 'CLP',
-      Number(durationMinutes || 60),
-      imageUrl || null,
-      isActive === undefined ? 1 : Number(Boolean(isActive)),
-      Number(orderIndex || nextOrderIndex)
-    ]
-  );
+        Number(price || 0),
+        currency || 'CLP',
+        Number(durationMinutes || 60),
+        null,
+        isActive === undefined ? 1 : Number(Boolean(isActive)),
+        Number(orderIndex || nextOrderIndex)
+      ]
+    );
 
-  return res.status(201).json({
-    id: result.insertId,
-    message: 'Servicio creado.'
-  });
+    await replaceServiceImages(connection, result.insertId, normalizedImages);
+    await connection.commit();
+
+    return res.status(201).json({
+      id: result.insertId,
+      message: 'Servicio creado.'
+    });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const updateService = async (req, res) => {
   const { id } = req.params;
-  const {
-    title,
-    description,
-    imageUrl,
-    price,
-    currency,
-    durationMinutes,
-    isActive,
-    orderIndex
-  } = req.body;
+  const { title, description, price, currency, durationMinutes, isActive, orderIndex, images } =
+    req.body;
 
-  await pool.query(
-    `
-      UPDATE services
-      SET
-        title = ?,
-        description = ?,
-        price = ?,
-        currency = ?,
-        duration_minutes = ?,
-        image_url = ?,
-        is_active = ?,
-        order_index = ?
-      WHERE id = ?
-    `,
-    [
-      title,
-      description,
-      Number(price || 0),
-      currency || 'CLP',
-      Number(durationMinutes || 60),
-      imageUrl || null,
-      Number(Boolean(isActive)),
-      Number(orderIndex || 0),
-      id
-    ]
-  );
+  if (Array.isArray(images) && images.length > 10) {
+    return res.status(400).json({ message: 'Cada servicio admite un maximo de 10 imagenes.' });
+  }
+
+  const normalizedImages = normalizeServiceImagesInput(images);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.query(
+      `
+        UPDATE services
+        SET
+          title = ?,
+          description = ?,
+          price = ?,
+          currency = ?,
+          duration_minutes = ?,
+          image_url = ?,
+          is_active = ?,
+          order_index = ?
+        WHERE id = ?
+      `,
+      [
+        title,
+        description,
+        Number(price || 0),
+        currency || 'CLP',
+        Number(durationMinutes || 60),
+        null,
+        Number(Boolean(isActive)),
+        Number(orderIndex || 0),
+        id
+      ]
+    );
+
+    await replaceServiceImages(connection, id, normalizedImages);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 
   return res.json({ message: 'Servicio actualizado.' });
 };
 
 export const deleteService = async (req, res) => {
   const { id } = req.params;
+  await pool.query('DELETE FROM service_images WHERE service_id = ?', [id]);
   await pool.query('DELETE FROM services WHERE id = ?', [id]);
   return res.json({ message: 'Servicio eliminado.' });
 };

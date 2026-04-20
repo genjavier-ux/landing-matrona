@@ -1,23 +1,10 @@
 import { pool } from '../config/db.js';
 import { addMinutesToTime, getAvailabilityForDate } from '../utils/availability.js';
+import { fetchServicesWithImages } from '../utils/services.js';
 
 export const getPublicContent = async (_req, res) => {
   const [sections] = await pool.query('SELECT `key`, title, content FROM site_sections');
-  const [services] = await pool.query(
-    `
-      SELECT
-        id,
-        title,
-        description,
-        price,
-        currency,
-        duration_minutes AS durationMinutes,
-        image_url AS imageUrl
-      FROM services
-      WHERE is_active = 1
-      ORDER BY order_index, id
-    `
-  );
+  const services = await fetchServicesWithImages({ onlyActive: true });
   const [testimonials] = await pool.query(
     `
       SELECT

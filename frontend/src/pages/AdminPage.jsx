@@ -11,6 +11,7 @@ import {
   updateService,
   updateWeeklyAvailability
 } from '../services/api';
+import ServiceEditorModal from '../components/ServiceEditorModal';
 
 const adminTabs = [
   { id: 'pages', label: 'Paginas' },
@@ -100,7 +101,7 @@ const initialServiceForm = {
   price: '0',
   currency: 'CLP',
   durationMinutes: '60',
-  imageUrl: '',
+  images: [],
   isActive: true,
   orderIndex: '0'
 };
@@ -153,6 +154,11 @@ const normalizeServices = (rows = []) =>
     currency: service.currency || 'CLP',
     durationMinutes: String(service.durationMinutes ?? 60),
     imageUrl: service.imageUrl || '',
+    images: Array.isArray(service.images)
+      ? service.images
+      : service.imageUrl
+        ? [service.imageUrl]
+        : [],
     isActive: Boolean(service.isActive),
     orderIndex: String(service.orderIndex ?? 0)
   }));
@@ -176,7 +182,11 @@ export default function AdminPage() {
   const [pageSections, setPageSections] = useState(normalizeSections());
   const [bookingSettings, setBookingSettings] = useState(normalizeWeeklyAvailability());
   const [services, setServices] = useState([]);
-  const [newServiceForm, setNewServiceForm] = useState(initialServiceForm);
+  const [serviceModal, setServiceModal] = useState({
+    isOpen: false,
+    mode: 'create',
+    service: initialServiceForm
+  });
   const [testimonials, setTestimonials] = useState([]);
   const [newTestimonialForm, setNewTestimonialForm] = useState(initialTestimonialForm);
   const [pageStatus, setPageStatus] = useState({ type: '', message: '' });
@@ -357,28 +367,35 @@ export default function AdminPage() {
     }
   };
 
-  const handleNewServiceChange = (field, value) => {
-    setNewServiceForm((currentValue) => ({
-      ...currentValue,
-      [field]: value
-    }));
+  const handleOpenCreateServiceModal = () => {
+    setServiceModal({
+      isOpen: true,
+      mode: 'create',
+      service: initialServiceForm
+    });
   };
 
-  const handleServiceFieldChange = (serviceId, field, value) => {
-    setServices((currentValue) =>
-      currentValue.map((service) =>
-        service.id === serviceId
-          ? {
-              ...service,
-              [field]: value
-            }
-          : service
-      )
-    );
+  const handleOpenEditServiceModal = (service) => {
+    setServiceModal({
+      isOpen: true,
+      mode: 'edit',
+      service: {
+        ...service,
+        images: [...(service.images || [])]
+      }
+    });
   };
 
-  const handleCreateService = async () => {
-    if (!newServiceForm.title || !newServiceForm.description) {
+  const handleCloseServiceModal = () => {
+    setServiceModal({
+      isOpen: false,
+      mode: 'create',
+      service: initialServiceForm
+    });
+  };
+
+  const handleCreateService = async (serviceForm) => {
+    if (!serviceForm.title || !serviceForm.description) {
       setServiceStatus({
         type: 'error',
         message: 'El servicio requiere titulo y descripcion.'
@@ -392,15 +409,15 @@ export default function AdminPage() {
     try {
       const response = await createService(
         {
-          ...newServiceForm,
-          price: Number(newServiceForm.price || 0),
-          durationMinutes: Number(newServiceForm.durationMinutes || 60),
-          orderIndex: Number(newServiceForm.orderIndex || 0)
+          ...serviceForm,
+          price: Number(serviceForm.price || 0),
+          durationMinutes: Number(serviceForm.durationMinutes || 60),
+          orderIndex: Number(serviceForm.orderIndex || 0)
         },
         token
       );
-      setNewServiceForm(initialServiceForm);
       await refreshDashboard(token);
+      handleCloseServiceModal();
       setServiceStatus({
         type: 'success',
         message: response.message || 'Servicio creado.'
@@ -419,9 +436,8 @@ export default function AdminPage() {
     }
   };
 
-  const handleSaveService = async (serviceId) => {
-    const service = services.find((item) => item.id === serviceId);
-    if (!service) {
+  const handleSaveService = async (serviceId, serviceForm) => {
+    if (!serviceId) {
       return;
     }
 
@@ -432,14 +448,15 @@ export default function AdminPage() {
       const response = await updateService(
         serviceId,
         {
-          ...service,
-          price: Number(service.price || 0),
-          durationMinutes: Number(service.durationMinutes || 60),
-          orderIndex: Number(service.orderIndex || 0)
+          ...serviceForm,
+          price: Number(serviceForm.price || 0),
+          durationMinutes: Number(serviceForm.durationMinutes || 60),
+          orderIndex: Number(serviceForm.orderIndex || 0)
         },
         token
       );
       await refreshDashboard(token);
+      handleCloseServiceModal();
       setServiceStatus({
         type: 'success',
         message: response.message || 'Servicio actualizado.'
@@ -456,6 +473,15 @@ export default function AdminPage() {
     } finally {
       setBusyAction('');
     }
+  };
+
+  const handleSubmitServiceModal = async (serviceForm) => {
+    if (serviceModal.mode === 'edit') {
+      await handleSaveService(serviceModal.service.id, serviceForm);
+      return;
+    }
+
+    await handleCreateService(serviceForm);
   };
 
   const handleDeleteService = async (serviceId) => {
@@ -869,8 +895,8 @@ export default function AdminPage() {
                   <span className="section-tag">Servicios</span>
                   <h2>CRUD de servicios</h2>
                   <p>
-                    Crea, edita y elimina servicios. Estos datos se muestran automaticamente en la
-                    pagina publica.
+                    Gestiona el catalogo desde una tabla y abre el detalle en un modal para crear o
+                    editar cada servicio.
                   </p>
                 </div>
 
@@ -878,206 +904,103 @@ export default function AdminPage() {
                   <p className={`form-status ${serviceStatus.type}`}>{serviceStatus.message}</p>
                 ) : null}
 
-                <article className="admin-editor-card">
-                  <div className="admin-card-header">
-                    <div>
-                      <strong>Nuevo servicio</strong>
-                      <span>Agrega un servicio nuevo al catalogo publico.</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      disabled={busyAction === 'create-service'}
-                      onClick={handleCreateService}
-                    >
-                      {busyAction === 'create-service' ? 'Creando...' : 'Crear servicio'}
-                    </button>
+                <div className="admin-table-toolbar">
+                  <div className="admin-table-note">
+                    <span className="flow-label">Catalogo</span>
+                    <strong>{services.length} servicios cargados</strong>
                   </div>
 
-                  <div className="field-grid admin-form-grid">
-                    <label className="field">
-                      <span>Titulo</span>
-                      <input
-                        type="text"
-                        value={newServiceForm.title}
-                        onChange={(event) => handleNewServiceChange('title', event.target.value)}
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Precio</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={newServiceForm.price}
-                        onChange={(event) => handleNewServiceChange('price', event.target.value)}
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Duracion</span>
-                      <select
-                        value={newServiceForm.durationMinutes}
-                        onChange={(event) =>
-                          handleNewServiceChange('durationMinutes', event.target.value)
-                        }
-                      >
-                        {durationOptions.map((minutes) => (
-                          <option key={minutes} value={minutes}>
-                            {minutes} minutos
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="field">
-                      <span>Orden</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={newServiceForm.orderIndex}
-                        onChange={(event) => handleNewServiceChange('orderIndex', event.target.value)}
-                      />
-                    </label>
-
-                    <label className="field admin-form-span-2">
-                      <span>Imagen URL</span>
-                      <input
-                        type="url"
-                        value={newServiceForm.imageUrl}
-                        onChange={(event) => handleNewServiceChange('imageUrl', event.target.value)}
-                      />
-                    </label>
-
-                    <label className="field admin-form-span-2">
-                      <span>Descripcion</span>
-                      <textarea
-                        rows="4"
-                        value={newServiceForm.description}
-                        onChange={(event) => handleNewServiceChange('description', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                </article>
-
-                <div className="admin-section-grid">
-                  {services.map((service) => (
-                    <article key={service.id} className="admin-editor-card">
-                      <div className="admin-card-header">
-                        <div>
-                          <strong>{service.title}</strong>
-                          <span>ID {service.id}</span>
-                        </div>
-
-                        <div className="admin-card-actions">
-                          <button
-                            type="button"
-                            className="button button-secondary"
-                            disabled={busyAction === `service:${service.id}`}
-                            onClick={() => handleSaveService(service.id)}
-                          >
-                            {busyAction === `service:${service.id}` ? 'Guardando...' : 'Guardar'}
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-secondary"
-                            disabled={busyAction === `delete-service:${service.id}`}
-                            onClick={() => handleDeleteService(service.id)}
-                          >
-                            {busyAction === `delete-service:${service.id}` ? 'Eliminando...' : 'Eliminar'}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="field-grid admin-form-grid">
-                        <label className="field">
-                          <span>Titulo</span>
-                          <input
-                            type="text"
-                            value={service.title}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'title', event.target.value)
-                            }
-                          />
-                        </label>
-
-                        <label className="field">
-                          <span>Precio</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={service.price}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'price', event.target.value)
-                            }
-                          />
-                        </label>
-
-                        <label className="field">
-                          <span>Duracion</span>
-                          <select
-                            value={service.durationMinutes}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'durationMinutes', event.target.value)
-                            }
-                          >
-                            {durationOptions.map((minutes) => (
-                              <option key={minutes} value={minutes}>
-                                {minutes} minutos
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="field">
-                          <span>Orden</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={service.orderIndex}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'orderIndex', event.target.value)
-                            }
-                          />
-                        </label>
-
-                        <label className="field admin-form-span-2">
-                          <span>Imagen URL</span>
-                          <input
-                            type="url"
-                            value={service.imageUrl}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'imageUrl', event.target.value)
-                            }
-                          />
-                        </label>
-
-                        <label className="field admin-inline-field">
-                          <span>Activo</span>
-                          <input
-                            type="checkbox"
-                            checked={service.isActive}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'isActive', event.target.checked)
-                            }
-                          />
-                        </label>
-
-                        <label className="field admin-form-span-2">
-                          <span>Descripcion</span>
-                          <textarea
-                            rows="4"
-                            value={service.description}
-                            onChange={(event) =>
-                              handleServiceFieldChange(service.id, 'description', event.target.value)
-                            }
-                          />
-                        </label>
-                      </div>
-                    </article>
-                  ))}
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={handleOpenCreateServiceModal}
+                  >
+                    Nuevo servicio
+                  </button>
                 </div>
+
+                <div className="admin-table-shell">
+                  <table className="admin-table services-admin-table">
+                    <thead>
+                      <tr>
+                        <th>Servicio</th>
+                        <th>Precio</th>
+                        <th>Duracion</th>
+                        <th>Imagenes</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {services.map((service) => (
+                        <tr key={service.id}>
+                          <td>
+                            <div className="service-table-main">
+                              {service.images?.[0] ? (
+                                <img
+                                  src={service.images[0]}
+                                  alt={service.title}
+                                  className="service-row-thumbnail"
+                                />
+                              ) : (
+                                <div className="service-row-thumbnail is-empty">LS</div>
+                              )}
+
+                              <div>
+                                <strong>{service.title}</strong>
+                                <span>ID {service.id}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            {service.currency} {Number(service.price || 0).toLocaleString('es-CL')}
+                          </td>
+                          <td>{service.durationMinutes} min</td>
+                          <td>{service.images?.length || 0} / 10</td>
+                          <td>
+                            <span
+                              className={`admin-state-pill ${service.isActive ? 'is-active' : 'is-muted'}`}
+                            >
+                              {service.isActive ? 'Activo' : 'Oculto'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="admin-table-actions">
+                              <button
+                                type="button"
+                                className="button button-secondary admin-table-button"
+                                onClick={() => handleOpenEditServiceModal(service)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-secondary admin-table-button"
+                                disabled={busyAction === `delete-service:${service.id}`}
+                                onClick={() => handleDeleteService(service.id)}
+                              >
+                                {busyAction === `delete-service:${service.id}` ? 'Eliminando...' : 'Eliminar'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <ServiceEditorModal
+                  isOpen={serviceModal.isOpen}
+                  mode={serviceModal.mode}
+                  service={serviceModal.service}
+                  durationOptions={durationOptions}
+                  isSubmitting={
+                    busyAction === 'create-service' ||
+                    busyAction === `service:${serviceModal.service?.id || ''}`
+                  }
+                  onClose={handleCloseServiceModal}
+                  onSubmit={handleSubmitServiceModal}
+                />
               </section>
             ) : null}
 

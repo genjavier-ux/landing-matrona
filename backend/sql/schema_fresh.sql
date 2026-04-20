@@ -32,6 +32,15 @@ CREATE TABLE services (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE service_images (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  service_id INT NOT NULL,
+  image_data LONGTEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_service_images_service_id (service_id)
+);
+
 CREATE TABLE testimonials (
   id INT AUTO_INCREMENT PRIMARY KEY,
   patient_name_alias VARCHAR(120) NOT NULL,

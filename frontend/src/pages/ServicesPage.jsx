@@ -42,9 +42,18 @@ export default function ServicesPage() {
 
             <p>{service.description}</p>
 
-            {service.imageUrl ? (
+            {service.images?.[0] || service.imageUrl ? (
               <div className="service-public-image-wrap">
-                <img src={service.imageUrl} alt={service.title} className="service-public-image" />
+                <img
+                  src={service.images?.[0] || service.imageUrl}
+                  alt={service.title}
+                  className="service-public-image"
+                />
+                {service.images?.length > 1 ? (
+                  <span className="service-public-gallery-count">
+                    {service.images.length} imagenes
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </article>

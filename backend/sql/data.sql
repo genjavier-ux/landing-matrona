@@ -42,6 +42,16 @@ ON DUPLICATE KEY UPDATE
   title = VALUES(title),
   content = VALUES(content);
 
+DELETE si
+FROM service_images si
+INNER JOIN services s ON s.id = si.service_id
+WHERE s.title IN (
+  'Control pre y post natal',
+  'Consejeria en lactancia',
+  'Control ginecologico preventivo',
+  'Educacion para familias'
+);
+
 DELETE FROM services
 WHERE title IN (
   'Control pre y post natal',
