@@ -3,51 +3,69 @@ import { addMinutesToTime, getAvailabilityForDate } from '../utils/availability.
 import { fetchServicesWithImages } from '../utils/services.js';
 
 export const getPublicContent = async (_req, res) => {
-  const [sections] = await pool.query('SELECT `key`, title, content FROM site_sections');
-  const services = await fetchServicesWithImages({ onlyActive: true });
-  const [testimonials] = await pool.query(
-    `
-      SELECT
-        id,
-        patient_name_alias AS patientNameAlias,
-        content,
-        rating
-      FROM testimonials
-      WHERE status = 'approved'
-        AND is_visible = 1
-      ORDER BY id DESC
-      LIMIT 8
-    `
-  );
-  const [gallery] = await pool.query(
-    `
-      SELECT
-        id,
-        title,
-        description,
-        image_url AS imageUrl
-      FROM gallery_items
-      WHERE is_active = 1
-      ORDER BY order_index, id
-    `
-  );
-  const [socialLinks] = await pool.query(
-    'SELECT id, platform, url FROM social_links WHERE is_active = 1'
-  );
-  const [weeklyAvailability] = await pool.query(
-    `
-      SELECT
-        id,
-        day_of_week AS dayOfWeek,
-        is_enabled AS isEnabled,
-        start_time AS startTime,
-        end_time AS endTime,
-        slot_minutes AS slotMinutes
-      FROM weekly_availability
-      WHERE is_enabled = 1
-      ORDER BY day_of_week
-    `
-  );
+  const sectionsPromise = pool
+    .query('SELECT `key`, title, content FROM site_sections')
+    .then(([rows]) => rows);
+  const servicesPromise = fetchServicesWithImages({ onlyActive: true });
+  const testimonialsPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          patient_name_alias AS patientNameAlias,
+          content,
+          rating
+        FROM testimonials
+        WHERE status = 'approved'
+          AND is_visible = 1
+        ORDER BY id DESC
+        LIMIT 8
+      `
+    )
+    .then(([rows]) => rows);
+  const galleryPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          title,
+          description,
+          image_url AS imageUrl
+        FROM gallery_items
+        WHERE is_active = 1
+        ORDER BY order_index, id
+      `
+    )
+    .then(([rows]) => rows);
+  const socialLinksPromise = pool
+    .query('SELECT id, platform, url FROM social_links WHERE is_active = 1')
+    .then(([rows]) => rows);
+  const weeklyAvailabilityPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          day_of_week AS dayOfWeek,
+          is_enabled AS isEnabled,
+          start_time AS startTime,
+          end_time AS endTime,
+          slot_minutes AS slotMinutes
+        FROM weekly_availability
+        WHERE is_enabled = 1
+        ORDER BY day_of_week
+      `
+    )
+    .then(([rows]) => rows);
+
+  const [sections, services, testimonials, gallery, socialLinks, weeklyAvailability] =
+    await Promise.all([
+      sectionsPromise,
+      servicesPromise,
+      testimonialsPromise,
+      galleryPromise,
+      socialLinksPromise,
+      weeklyAvailabilityPromise
+    ]);
 
   const hero = sections.find((item) => item.key === 'hero') || {
     title: 'Matrona Contigo',

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fetchPublicContent } from '../services/api';
 
+const PUBLIC_CONTENT_CACHE_KEY = 'matrona-public-content-cache';
+const PUBLIC_CONTENT_CACHE_TTL_MS = 60 * 1000;
+
 const defaultSections = {
   hero: {
     key: 'hero',
@@ -49,6 +52,9 @@ const defaultPublicContent = {
   weeklyAvailability: []
 };
 
+let memoryCacheEntry = null;
+let inFlightContentRequest = null;
+
 const toSectionMap = (sections) => {
   if (!sections) {
     return {};
@@ -93,31 +99,140 @@ const normalizePublicContent = (response = {}) => {
   };
 };
 
+const canUseStorage = () => typeof window !== 'undefined' && Boolean(window.sessionStorage);
+
+const isCacheFresh = (entry) =>
+  Boolean(entry?.timestamp) && Date.now() - entry.timestamp < PUBLIC_CONTENT_CACHE_TTL_MS;
+
+const saveCacheEntry = (entry) => {
+  memoryCacheEntry = entry;
+
+  if (!canUseStorage()) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(PUBLIC_CONTENT_CACHE_KEY, JSON.stringify(entry));
+  } catch (_error) {
+    // Ignore storage failures and keep the in-memory cache.
+  }
+};
+
+const readStoredCacheEntry = () => {
+  if (!canUseStorage()) {
+    return null;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(PUBLIC_CONTENT_CACHE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    if (!parsedValue?.data) {
+      return null;
+    }
+
+    return {
+      timestamp: Number(parsedValue.timestamp || 0),
+      data: normalizePublicContent(parsedValue.data)
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+const getCachedEntry = () => {
+  if (memoryCacheEntry) {
+    return memoryCacheEntry;
+  }
+
+  const storedEntry = readStoredCacheEntry();
+  if (storedEntry) {
+    memoryCacheEntry = storedEntry;
+  }
+
+  return storedEntry;
+};
+
+export const clearPublicContentCache = () => {
+  memoryCacheEntry = null;
+  inFlightContentRequest = null;
+
+  if (!canUseStorage()) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(PUBLIC_CONTENT_CACHE_KEY);
+  } catch (_error) {
+    // Ignore storage failures.
+  }
+};
+
+const loadPublicContent = async () => {
+  const cachedEntry = getCachedEntry();
+
+  if (isCacheFresh(cachedEntry)) {
+    return cachedEntry.data;
+  }
+
+  if (inFlightContentRequest) {
+    return inFlightContentRequest;
+  }
+
+  inFlightContentRequest = fetchPublicContent()
+    .then((response) => {
+      const normalizedResponse = normalizePublicContent(response);
+
+      saveCacheEntry({
+        timestamp: Date.now(),
+        data: normalizedResponse
+      });
+
+      return normalizedResponse;
+    })
+    .finally(() => {
+      inFlightContentRequest = null;
+    });
+
+  return inFlightContentRequest;
+};
+
 export default function usePublicContent() {
-  const [content, setContent] = useState(defaultPublicContent);
+  const [content, setContent] = useState(() => getCachedEntry()?.data || defaultPublicContent);
   const [statusMessage, setStatusMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !getCachedEntry());
 
   useEffect(() => {
     let isMounted = true;
+    const cachedEntry = getCachedEntry();
+
+    if (cachedEntry?.data) {
+      setContent(cachedEntry.data);
+      setIsLoading(false);
+    }
 
     const loadContent = async () => {
       try {
-        const response = await fetchPublicContent();
+        const response = await loadPublicContent();
 
         if (!isMounted) {
           return;
         }
 
-        setContent(normalizePublicContent(response));
+        setContent(response);
         setStatusMessage('');
       } catch (_error) {
         if (!isMounted) {
           return;
         }
 
-        setContent(defaultPublicContent);
-        setStatusMessage('No fue posible cargar el backend. Se muestra una base visual temporal.');
+        if (!cachedEntry?.data) {
+          setContent(defaultPublicContent);
+          setStatusMessage('No fue posible cargar el backend. Se muestra una base visual temporal.');
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);

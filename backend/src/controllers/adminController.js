@@ -5,85 +5,121 @@ import {
   replaceServiceImages
 } from '../utils/services.js';
 
+const isValidDateKey = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
+
 export const getDashboard = async (_req, res) => {
-  const [sections] = await pool.query(
-    'SELECT id, `key`, title, content FROM site_sections ORDER BY id'
-  );
-  const services = await fetchServicesWithImages();
-  const [testimonials] = await pool.query(
-    `
-      SELECT
-        id,
-        patient_name_alias AS patientNameAlias,
-        content,
-        rating,
-        is_visible AS isVisible,
-        status,
-        created_at AS createdAt
-      FROM testimonials
-      ORDER BY created_at DESC
-    `
-  );
-  const [gallery] = await pool.query(
-    `
-      SELECT
-        id,
-        title,
-        description,
-        image_url AS imageUrl,
-        is_active AS isActive,
-        order_index AS orderIndex
-      FROM gallery_items
-      ORDER BY order_index, id
-    `
-  );
-  const [weeklyAvailability] = await pool.query(
-    `
-      SELECT
-        id,
-        day_of_week AS dayOfWeek,
-        is_enabled AS isEnabled,
-        start_time AS startTime,
-        end_time AS endTime,
-        slot_minutes AS slotMinutes
-      FROM weekly_availability
-      ORDER BY day_of_week
-    `
-  );
-  const [appointments] = await pool.query(
-    `
-      SELECT
-        id,
-        full_name AS fullName,
-        email,
-        phone,
-        service_id AS serviceId,
-        service_name AS serviceName,
-        preferred_date AS preferredDate,
-        preferred_time AS preferredTime,
-        end_time AS endTime,
-        slot_minutes AS slotMinutes,
-        notes,
-        status,
-        created_at AS createdAt
-      FROM appointments
-      ORDER BY preferred_date DESC, preferred_time DESC
-      LIMIT 30
-    `
-  );
-  const [reviewCodes] = await pool.query(
-    `
-      SELECT
-        id,
-        code,
-        is_used AS isUsed,
-        expires_at AS expiresAt,
-        created_at AS createdAt
-      FROM review_codes
-      ORDER BY created_at DESC
-      LIMIT 12
-    `
-  );
+  const sectionsPromise = pool
+    .query('SELECT id, `key`, title, content FROM site_sections ORDER BY id')
+    .then(([rows]) => rows);
+  const servicesPromise = fetchServicesWithImages();
+  const testimonialsPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          patient_name_alias AS patientNameAlias,
+          content,
+          rating,
+          is_visible AS isVisible,
+          status,
+          created_at AS createdAt
+        FROM testimonials
+        ORDER BY created_at DESC
+      `
+    )
+    .then(([rows]) => rows);
+  const galleryPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          title,
+          description,
+          image_url AS imageUrl,
+          is_active AS isActive,
+          order_index AS orderIndex
+        FROM gallery_items
+        ORDER BY order_index, id
+      `
+    )
+    .then(([rows]) => rows);
+  const weeklyAvailabilityPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          day_of_week AS dayOfWeek,
+          is_enabled AS isEnabled,
+          start_time AS startTime,
+          end_time AS endTime,
+          slot_minutes AS slotMinutes
+        FROM weekly_availability
+        ORDER BY day_of_week
+      `
+    )
+    .then(([rows]) => rows);
+  const appointmentsPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        ORDER BY preferred_date DESC, preferred_time DESC
+        LIMIT 30
+      `
+    )
+    .then(([rows]) => rows);
+  const reviewCodesPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          code,
+          is_used AS isUsed,
+          expires_at AS expiresAt,
+          created_at AS createdAt
+        FROM review_codes
+        ORDER BY created_at DESC
+        LIMIT 12
+      `
+    )
+    .then(([rows]) => rows);
+
+  const [sections, services, testimonials, gallery, weeklyAvailability, appointments, reviewCodes] =
+    await Promise.all([
+      sectionsPromise,
+      servicesPromise,
+      testimonialsPromise,
+      galleryPromise,
+      weeklyAvailabilityPromise,
+      appointmentsPromise,
+      reviewCodesPromise
+    ]);
 
   return res.json({
     sections,
@@ -358,27 +394,58 @@ export const upsertWeeklyAvailability = async (req, res) => {
   return res.json({ message: 'Disponibilidad semanal actualizada.' });
 };
 
-export const getAppointments = async (_req, res) => {
-  const [rows] = await pool.query(
-    `
-      SELECT
-        id,
-        full_name AS fullName,
-        email,
-        phone,
-        service_id AS serviceId,
-        service_name AS serviceName,
-        preferred_date AS preferredDate,
-        preferred_time AS preferredTime,
-        end_time AS endTime,
-        slot_minutes AS slotMinutes,
-        notes,
-        status,
-        created_at AS createdAt
-      FROM appointments
-      ORDER BY preferred_date DESC, preferred_time DESC
-    `
-  );
+export const getAppointments = async (req, res) => {
+  const { from, to } = req.query;
+  const hasRange = Boolean(from || to);
+
+  if (hasRange && (!from || !to)) {
+    return res.status(400).json({ message: 'Debes enviar from y to para filtrar por rango.' });
+  }
+
+  if (hasRange && (!isValidDateKey(from) || !isValidDateKey(to) || from > to)) {
+    return res.status(400).json({ message: 'El rango de fechas no es valido.' });
+  }
+
+  const query = hasRange
+    ? `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        WHERE preferred_date BETWEEN ? AND ?
+        ORDER BY preferred_date ASC, preferred_time ASC
+      `
+    : `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        ORDER BY preferred_date DESC, preferred_time DESC
+      `;
+  const params = hasRange ? [from, to] : [];
+  const [rows] = await pool.query(query, params);
 
   return res.json(rows);
 };

@@ -8,7 +8,8 @@ export default function AppModal({
   subtitle,
   children,
   footer,
-  size = 'large'
+  size = 'large',
+  kicker = 'Panel'
 }) {
   useEffect(() => {
     if (!isOpen) {
@@ -50,7 +51,7 @@ export default function AppModal({
 
         <div className="app-modal-header">
           <div>
-            <span className="section-tag">Panel</span>
+            <span className="section-tag">{kicker}</span>
             <h3>{title}</h3>
             {subtitle ? <p>{subtitle}</p> : null}
           </div>

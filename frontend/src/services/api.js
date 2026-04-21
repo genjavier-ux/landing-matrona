@@ -62,8 +62,9 @@ export const updateWeeklyAvailability = async (payload, token) => {
   return data;
 };
 
-export const fetchAdminAppointments = async (token) => {
+export const fetchAdminAppointments = async (token, params = {}) => {
   const { data } = await api.get('/admin/appointments', {
+    params,
     headers: { Authorization: `Bearer ${token}` }
   });
   return data;

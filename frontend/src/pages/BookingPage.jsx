@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import BookingCalendar from '../components/BookingCalendar';
 import usePublicContent from '../hooks/usePublicContent';
 import { createAppointment, fetchAvailabilityByDate } from '../services/api';
@@ -28,6 +29,7 @@ const createWeeklyAvailabilityMap = (rows = []) =>
 
 export default function BookingPage() {
   const { content } = usePublicContent();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState(initialForm);
   const [weeklyAvailability, setWeeklyAvailability] = useState({});
   const [availabilityByDate, setAvailabilityByDate] = useState({});
@@ -41,6 +43,35 @@ export default function BookingPage() {
   useEffect(() => {
     setWeeklyAvailability(createWeeklyAvailabilityMap(content.weeklyAvailability));
   }, [content.weeklyAvailability]);
+
+  const services = content.services || [];
+  const requestedServiceId = searchParams.get('service');
+
+  useEffect(() => {
+    if (!requestedServiceId || !services.length) {
+      return;
+    }
+
+    const selectedService = services.find((service) => String(service.id) === requestedServiceId);
+    if (!selectedService) {
+      return;
+    }
+
+    setForm((currentValue) => {
+      if (
+        currentValue.serviceId === String(selectedService.id) &&
+        currentValue.serviceName === selectedService.title
+      ) {
+        return currentValue;
+      }
+
+      return {
+        ...currentValue,
+        serviceId: String(selectedService.id),
+        serviceName: selectedService.title
+      };
+    });
+  }, [requestedServiceId, services]);
 
   useEffect(() => {
     if (!form.preferredDate) {
@@ -127,11 +158,20 @@ export default function BookingPage() {
         ...form,
         serviceId: form.serviceId ? Number(form.serviceId) : null
       });
+      const selectedService = services.find((service) => String(service.id) === requestedServiceId);
       setStatus({
         type: 'success',
         message: response.message || 'Reserva enviada correctamente.'
       });
-      setForm(initialForm);
+      setForm(
+        selectedService
+          ? {
+              ...initialForm,
+              serviceId: String(selectedService.id),
+              serviceName: selectedService.title
+            }
+          : initialForm
+      );
     } catch (error) {
       setStatus({
         type: 'error',
@@ -192,7 +232,6 @@ export default function BookingPage() {
   const isSubmitDisabled =
     isSubmitting || !form.fullName || !form.email || !form.preferredDate || !form.preferredTime;
   const bookingSection = content.sections.booking;
-  const services = content.services || [];
 
   return (
     <section className="form-page booking-page">
