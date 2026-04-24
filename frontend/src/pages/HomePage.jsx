@@ -1,24 +1,3 @@
-<<<<<<< HEAD
-import { useEffect, useState } from 'react';
-import { fetchPublicContent } from '../services/api';
-import {
-  AboutSection,
-  fallbackContent,
-  HomeHeader,
-  HomeHero,
-  HomeSkeleton,
-  mockServices,
-  mockTestimonials,
-  navItems,
-  PlaceholderSections,
-  placeholderSections,
-  ServiceGalleryModal,
-  ServicesSection,
-  servicesPerPage,
-  TestimonialsSection
-} from '../components/home';
-import { NoticeBanner } from '../components/ui';
-=======
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import usePublicContent from '../hooks/usePublicContent';
@@ -78,7 +57,6 @@ const getNextHeroSeed = () => {
     return 0;
   }
 };
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
 
 export default function HomePage() {
   const { content, statusMessage } = usePublicContent();
@@ -93,55 +71,6 @@ export default function HomePage() {
   const activeVisual = heroVisuals[activeVisualIndex] || defaultHeroVisuals[0];
 
   return (
-<<<<<<< HEAD
-    <main className="clean-home">
-      <HomeHeader navItems={navItems} activeSection={activeSection} onSelect={handleNavClick} />
-
-      <HomeHero
-        content={content}
-        onShowServices={() => handleNavClick('servicios')}
-        onShowAbout={() => handleNavClick('sobre-mi')}
-      />
-
-      <AboutSection />
-
-      <ServicesSection
-        services={services}
-        activeService={activeService}
-        activeServiceIndex={safeActiveServiceIndex}
-        activeServicePage={activeServicePage}
-        totalServicePages={totalServicePages}
-        visibleServices={visibleServices}
-        servicePageStart={servicePageStart}
-        onPrevPage={() => handleServicePageChange(-1)}
-        onNextPage={() => handleServicePageChange(1)}
-        onSelectPage={(pageIndex) => setActiveServiceIndex(pageIndex * servicesPerPage)}
-        onSelectService={handleServiceCardClick}
-        onOpenGallery={() => openServiceGallery(safeActiveServiceIndex, 0)}
-      />
-
-      <ServiceGalleryModal
-        openGalleryService={openGalleryService}
-        galleryState={galleryState}
-        activeGalleryImage={activeGalleryImage}
-        onClose={closeServiceGallery}
-        onPrev={() => moveGallery(-1)}
-        onNext={() => moveGallery(1)}
-        onSelectImage={(index) => setGalleryState((prev) => ({ ...prev, slideIndex: index }))}
-      />
-
-      <TestimonialsSection
-        testimonials={mockTestimonials}
-        activeTestimonial={activeTestimonial}
-        getCardOffset={getCardOffset}
-        onSelect={setActiveTestimonial}
-      />
-
-      <PlaceholderSections sections={placeholderSections} />
-
-      {notice ? <NoticeBanner className="clean-notice">{notice}</NoticeBanner> : null}
-    </main>
-=======
     <div className="home-page">
       <section className={`hero-section hero-section-${activeVariant.id} section-shell`}>
         <div className="hero-backdrop" aria-hidden="true">
@@ -232,6 +161,5 @@ export default function HomePage() {
         </div>
       </section>
     </div>
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
   );
 }

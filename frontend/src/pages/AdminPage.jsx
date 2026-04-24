@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-<<<<<<< HEAD
-  approveTestimonial,
-  createReviewCode,
-  createService,
-=======
   createAdminTestimonial,
   createGalleryItem,
   createService,
   deleteGalleryItem,
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
   deleteService,
   deleteTestimonial,
   fetchAdminAppointments,
@@ -21,23 +15,9 @@ import {
   updateService,
   updateWeeklyAvailability
 } from '../services/api';
-<<<<<<< HEAD
-import {
-  AdminLoadingPanel,
-  AdminLoginPanel,
-  AdminToolbar,
-  HeroEditorPanel,
-  ReviewCodesPanel,
-  ServiceCreatePanel,
-  ServiceEditorGrid,
-  TestimonialsModerationTable
-} from '../components/admin';
-import { GridShell, NoticeBanner } from '../components/ui';
-=======
 import AppModal from '../components/AppModal';
 import ServiceEditorModal from '../components/ServiceEditorModal';
 import { clearPublicContentCache } from '../hooks/usePublicContent';
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
 
 const adminTabs = [
   {
@@ -516,14 +496,6 @@ export default function AdminPage() {
   const [pagesView, setPagesView] = useState('admin');
   const [bookingSettings, setBookingSettings] = useState(normalizeWeeklyAvailability());
   const [services, setServices] = useState([]);
-<<<<<<< HEAD
-  const [newServiceForm, setNewServiceForm] = useState(initialService);
-  const [codeForm, setCodeForm] = useState(initialCodeForm);
-  const [testimonialFilter, setTestimonialFilter] = useState('all');
-  const [message, setMessage] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isLoadingDashboard, setIsLoadingDashboard] = useState(Boolean(token));
-=======
   const [heroVisuals, setHeroVisuals] = useState([]);
   const [newHeroVisual, setNewHeroVisual] = useState(initialHeroVisualForm);
   const [serviceModal, setServiceModal] = useState({
@@ -540,7 +512,6 @@ export default function AdminPage() {
   const [testimonialStatus, setTestimonialStatus] = useState({ type: '', message: '' });
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
   const [busyAction, setBusyAction] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialAdminSidebarCollapsed);
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => startOfWeek(new Date()));
@@ -1071,10 +1042,6 @@ export default function AdminPage() {
   };
 
   const handleDeleteService = async (serviceId) => {
-<<<<<<< HEAD
-    const shouldDelete = window.confirm(
-      'Este servicio se eliminara de la landing. Quieres continuar?'
-=======
     const shouldDelete = window.confirm('Este servicio se eliminara de la pagina. Quieres continuar?');
     if (!shouldDelete) {
       return;
@@ -1122,7 +1089,6 @@ export default function AdminPage() {
             }
           : item
       )
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
     );
   };
 
@@ -1167,101 +1133,6 @@ export default function AdminPage() {
     }
   };
 
-<<<<<<< HEAD
-  const pendingTestimonials =
-    dashboard?.testimonials?.filter((testimonial) => testimonial.status === 'pending') || [];
-
-  const filteredTestimonials = (() => {
-    const testimonials = dashboard?.testimonials || [];
-
-    if (testimonialFilter === 'all') return testimonials;
-
-    return testimonials.filter((testimonial) => testimonial.status === testimonialFilter);
-  })();
-
-  if (!token) {
-    return (
-      <AdminLoginPanel
-        credentials={credentials}
-        isLoggingIn={isLoggingIn}
-        message={message}
-        onSubmit={handleLogin}
-        onCredentialsChange={(field, value) =>
-          setCredentials((prev) => ({ ...prev, [field]: value }))
-        }
-      />
-    );
-  }
-
-  if (isLoadingDashboard && !dashboard) {
-    return <AdminLoadingPanel />;
-  }
-
-  return (
-    <main className="layout admin-shell">
-      <AdminToolbar
-        serviceCount={services.length}
-        pendingCount={pendingTestimonials.length}
-        onLogout={handleLogout}
-      />
-
-      <GridShell className="admin-grid">
-        <HeroEditorPanel
-          heroForm={heroForm}
-          busyAction={busyAction}
-          onSubmit={handleHeroUpdate}
-          onChange={(field, value) => setHeroForm((prev) => ({ ...prev, [field]: value }))}
-        />
-
-        <ReviewCodesPanel
-          codeForm={codeForm}
-          reviewCodes={dashboard?.reviewCodes || []}
-          busyAction={busyAction}
-          formatDate={formatDate}
-          onSubmit={handleReviewCodeCreate}
-          onChange={(field, value) => setCodeForm((prev) => ({ ...prev, [field]: value }))}
-        />
-      </GridShell>
-
-      <section className="admin-section">
-        <div className="admin-section-head">
-          <div>
-            <span className="section-kicker">Servicios</span>
-            <h2>Agrega todos los servicios que quiera mostrar la matrona</h2>
-          </div>
-        </div>
-
-        <ServiceCreatePanel
-          form={newServiceForm}
-          busyAction={busyAction}
-          onSubmit={handleCreateService}
-          onChange={(field, value) =>
-            setNewServiceForm((prev) => ({ ...prev, [field]: value }))
-          }
-        />
-
-        <ServiceEditorGrid
-          services={services}
-          busyAction={busyAction}
-          onChange={handleServiceChange}
-          onSubmit={handleServiceUpdate}
-          onDelete={handleDeleteService}
-        />
-      </section>
-
-      <TestimonialsModerationTable
-        testimonials={filteredTestimonials}
-        filterValue={testimonialFilter}
-        busyAction={busyAction}
-        formatDate={formatDate}
-        onFilterChange={setTestimonialFilter}
-        onApprove={handleApprove}
-        onDelete={handleDelete}
-      />
-
-      {message ? <NoticeBanner>{message}</NoticeBanner> : null}
-    </main>
-=======
   const handleSaveTestimonial = async (testimonialId) => {
     const testimonial = testimonials.find((item) => item.id === testimonialId);
     if (!testimonial) {
@@ -2418,6 +2289,5 @@ export default function AdminPage() {
         ) : null}
       </AppModal>
     </section>
->>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
   );
 }
