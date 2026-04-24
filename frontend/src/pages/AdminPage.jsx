@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   approveTestimonial,
-  createService,
   createReviewCode,
+  createService,
   deleteService,
   deleteTestimonial,
   fetchAdminDashboard,
@@ -10,6 +10,17 @@ import {
   updateSection,
   updateService
 } from '../services/api';
+import {
+  AdminLoadingPanel,
+  AdminLoginPanel,
+  AdminToolbar,
+  HeroEditorPanel,
+  ReviewCodesPanel,
+  ServiceCreatePanel,
+  ServiceEditorGrid,
+  TestimonialsModerationTable
+} from '../components/admin';
+import { GridShell, NoticeBanner } from '../components/ui';
 
 const tokenStorageKey = 'matrona_admin_token';
 
@@ -43,6 +54,7 @@ export default function AdminPage() {
   const [services, setServices] = useState([]);
   const [newServiceForm, setNewServiceForm] = useState(initialService);
   const [codeForm, setCodeForm] = useState(initialCodeForm);
+  const [testimonialFilter, setTestimonialFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(Boolean(token));
@@ -193,7 +205,7 @@ export default function AdminPage() {
 
   const handleDeleteService = async (serviceId) => {
     const shouldDelete = window.confirm(
-      'Este servicio se eliminara de la landing. ¿Quieres continuar?'
+      'Este servicio se eliminara de la landing. Quieres continuar?'
     );
 
     if (!shouldDelete) return;
@@ -261,153 +273,60 @@ export default function AdminPage() {
     }
   };
 
+  const pendingTestimonials =
+    dashboard?.testimonials?.filter((testimonial) => testimonial.status === 'pending') || [];
+
+  const filteredTestimonials = (() => {
+    const testimonials = dashboard?.testimonials || [];
+
+    if (testimonialFilter === 'all') return testimonials;
+
+    return testimonials.filter((testimonial) => testimonial.status === testimonialFilter);
+  })();
+
   if (!token) {
     return (
-      <main className="layout admin-shell">
-        <section className="card admin-auth-card">
-          <span className="section-kicker">Acceso admin</span>
-          <h1>Inicia sesion para ver las pantallas editables</h1>
-          <p className="section-lead">
-            Al entrar veras el panel para editar hero, servicios, comentarios y codigos.
-          </p>
-
-          <form onSubmit={handleLogin} className="stack-form">
-            <input
-              required
-              type="text"
-              placeholder="admin@matrona.cl"
-              value={credentials.email}
-              onChange={(event) =>
-                setCredentials((prev) => ({ ...prev, email: event.target.value }))
-              }
-            />
-            <input
-              required
-              type="password"
-              placeholder="Contrasena"
-              value={credentials.password}
-              onChange={(event) =>
-                setCredentials((prev) => ({ ...prev, password: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={isLoggingIn}>
-              {isLoggingIn ? 'Ingresando...' : 'Iniciar sesion'}
-            </button>
-          </form>
-
-          {message && <p className="notice">{message}</p>}
-        </section>
-      </main>
+      <AdminLoginPanel
+        credentials={credentials}
+        isLoggingIn={isLoggingIn}
+        message={message}
+        onSubmit={handleLogin}
+        onCredentialsChange={(field, value) =>
+          setCredentials((prev) => ({ ...prev, [field]: value }))
+        }
+      />
     );
   }
 
   if (isLoadingDashboard && !dashboard) {
-    return (
-      <main className="layout admin-shell">
-        <section className="card admin-card">
-          <span className="section-kicker">Panel admin</span>
-          <h1>Cargando pantallas editables...</h1>
-          <p className="section-lead">Estamos preparando el contenido para editar.</p>
-        </section>
-      </main>
-    );
+    return <AdminLoadingPanel />;
   }
-
-  const pendingTestimonials =
-    dashboard?.testimonials?.filter((testimonial) => testimonial.status === 'pending') || [];
 
   return (
     <main className="layout admin-shell">
-      <section className="card admin-toolbar">
-        <div>
-          <span className="section-kicker">Panel editable</span>
-          <h1>Landing Matrona</h1>
-          <p className="section-lead">
-            Tras el login ya se muestran las pantallas editables con el contenido actual.
-          </p>
-        </div>
+      <AdminToolbar
+        serviceCount={services.length}
+        pendingCount={pendingTestimonials.length}
+        onLogout={handleLogout}
+      />
 
-        <div className="admin-toolbar-actions">
-          <div className="admin-summary">
-            <strong>{services.length}</strong>
-            <span>servicios</span>
-          </div>
-          <div className="admin-summary">
-            <strong>{pendingTestimonials.length}</strong>
-            <span>pendientes</span>
-          </div>
-          <button type="button" onClick={handleLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-      </section>
+      <GridShell className="admin-grid">
+        <HeroEditorPanel
+          heroForm={heroForm}
+          busyAction={busyAction}
+          onSubmit={handleHeroUpdate}
+          onChange={(field, value) => setHeroForm((prev) => ({ ...prev, [field]: value }))}
+        />
 
-      <div className="admin-grid">
-        <section className="card admin-card">
-          <span className="section-kicker">Hero editable</span>
-          <h2>Editar portada principal</h2>
-          <form onSubmit={handleHeroUpdate} className="stack-form">
-            <input
-              required
-              placeholder="Titulo principal"
-              value={heroForm.title}
-              onChange={(event) =>
-                setHeroForm((prev) => ({ ...prev, title: event.target.value }))
-              }
-            />
-            <textarea
-              required
-              placeholder="Texto de apoyo"
-              value={heroForm.content}
-              onChange={(event) =>
-                setHeroForm((prev) => ({ ...prev, content: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'hero'}>
-              {busyAction === 'hero' ? 'Guardando...' : 'Guardar hero'}
-            </button>
-          </form>
-        </section>
-
-        <section className="card admin-card">
-          <span className="section-kicker">Codigos</span>
-          <h2>Crear codigo para comentarios</h2>
-          <form onSubmit={handleReviewCodeCreate} className="stack-form">
-            <input
-              required
-              placeholder="Codigo unico"
-              value={codeForm.code}
-              onChange={(event) =>
-                setCodeForm((prev) => ({ ...prev, code: event.target.value }))
-              }
-            />
-            <input
-              type="datetime-local"
-              value={codeForm.expiresAt}
-              onChange={(event) =>
-                setCodeForm((prev) => ({ ...prev, expiresAt: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'review-code'}>
-              {busyAction === 'review-code' ? 'Creando...' : 'Crear codigo'}
-            </button>
-          </form>
-
-          <div className="admin-list">
-            {(dashboard?.reviewCodes || []).map((reviewCode) => (
-              <article key={reviewCode.id} className="admin-list-item">
-                <div>
-                  <strong>{reviewCode.code}</strong>
-                  <p>{formatDate(reviewCode.expiresAt)}</p>
-                </div>
-                <span className={reviewCode.isUsed ? 'status-pill used' : 'status-pill'}>
-                  {reviewCode.isUsed ? 'Usado' : 'Disponible'}
-                </span>
-              </article>
-            ))}
-          </div>
-        </section>
-      </div>
+        <ReviewCodesPanel
+          codeForm={codeForm}
+          reviewCodes={dashboard?.reviewCodes || []}
+          busyAction={busyAction}
+          formatDate={formatDate}
+          onSubmit={handleReviewCodeCreate}
+          onChange={(field, value) => setCodeForm((prev) => ({ ...prev, [field]: value }))}
+        />
+      </GridShell>
 
       <section className="admin-section">
         <div className="admin-section-head">
@@ -417,141 +336,35 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <section className="card admin-card admin-create-service">
-          <span className="section-kicker">Nuevo servicio</span>
-          <p className="section-lead">
-            La landing ya no depende de 1 o 3 servicios fijos. Desde aqui puede crear todos los
-            que necesite.
-          </p>
+        <ServiceCreatePanel
+          form={newServiceForm}
+          busyAction={busyAction}
+          onSubmit={handleCreateService}
+          onChange={(field, value) =>
+            setNewServiceForm((prev) => ({ ...prev, [field]: value }))
+          }
+        />
 
-          <form onSubmit={handleCreateService} className="stack-form">
-            <input
-              required
-              placeholder="Titulo del servicio"
-              value={newServiceForm.title}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, title: event.target.value }))
-              }
-            />
-            <textarea
-              required
-              placeholder="Descripcion del servicio"
-              value={newServiceForm.description}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, description: event.target.value }))
-              }
-            />
-            <input
-              placeholder="URL de imagen"
-              value={newServiceForm.imageUrl}
-              onChange={(event) =>
-                setNewServiceForm((prev) => ({ ...prev, imageUrl: event.target.value }))
-              }
-            />
-            <button type="submit" disabled={busyAction === 'create-service'}>
-              {busyAction === 'create-service' ? 'Creando...' : 'Agregar servicio'}
-            </button>
-          </form>
-        </section>
-
-        <div className="admin-service-grid">
-          {services.map((service) => (
-            <form
-              key={service.id}
-              onSubmit={(event) => handleServiceUpdate(event, service.id)}
-              className="card admin-card stack-form"
-            >
-              <strong className="admin-card-id">Servicio #{service.id}</strong>
-              <input
-                required
-                placeholder="Titulo"
-                value={service.title}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'title', event.target.value)
-                }
-              />
-              <textarea
-                required
-                placeholder="Descripcion"
-                value={service.description}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'description', event.target.value)
-                }
-              />
-              <input
-                placeholder="URL imagen"
-                value={service.imageUrl}
-                onChange={(event) =>
-                  handleServiceChange(service.id, 'imageUrl', event.target.value)
-                }
-              />
-              <div className="admin-actions-row">
-                <button type="submit" disabled={busyAction === `service-${service.id}`}>
-                  {busyAction === `service-${service.id}` ? 'Guardando...' : 'Guardar servicio'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteService(service.id)}
-                  disabled={busyAction === `delete-service-${service.id}`}
-                >
-                  {busyAction === `delete-service-${service.id}` ? 'Eliminando...' : 'Eliminar'}
-                </button>
-              </div>
-            </form>
-          ))}
-        </div>
+        <ServiceEditorGrid
+          services={services}
+          busyAction={busyAction}
+          onChange={handleServiceChange}
+          onSubmit={handleServiceUpdate}
+          onDelete={handleDeleteService}
+        />
       </section>
 
-      <section className="card admin-card">
-        <div className="admin-section-head">
-          <div>
-            <span className="section-kicker">Comentarios</span>
-            <h2>Moderacion</h2>
-          </div>
-        </div>
+      <TestimonialsModerationTable
+        testimonials={filteredTestimonials}
+        filterValue={testimonialFilter}
+        busyAction={busyAction}
+        formatDate={formatDate}
+        onFilterChange={setTestimonialFilter}
+        onApprove={handleApprove}
+        onDelete={handleDelete}
+      />
 
-        <div className="admin-list">
-          {(dashboard?.testimonials || []).length ? (
-            dashboard.testimonials.map((testimonial) => (
-              <article key={testimonial.id} className="admin-list-item admin-list-item-wide">
-                <div>
-                  <div className="admin-comment-head">
-                    <strong>{testimonial.patientNameAlias}</strong>
-                    <span className={`status-pill ${testimonial.status}`}>
-                      {testimonial.status}
-                    </span>
-                  </div>
-                  <p>{testimonial.content}</p>
-                  <small>{formatDate(testimonial.createdAt)}</small>
-                </div>
-
-                <div className="admin-actions-row">
-                  {testimonial.status !== 'approved' && (
-                    <button
-                      type="button"
-                      onClick={() => handleApprove(testimonial.id)}
-                      disabled={busyAction === `approve-${testimonial.id}`}
-                    >
-                      {busyAction === `approve-${testimonial.id}` ? 'Aprobando...' : 'Aprobar'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(testimonial.id)}
-                    disabled={busyAction === `delete-${testimonial.id}`}
-                  >
-                    {busyAction === `delete-${testimonial.id}` ? 'Eliminando...' : 'Eliminar'}
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="section-lead">Todavia no hay comentarios para moderar.</p>
-          )}
-        </div>
-      </section>
-
-      {message && <p className="notice">{message}</p>}
+      {message ? <NoticeBanner>{message}</NoticeBanner> : null}
     </main>
   );
 }
