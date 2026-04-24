@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useState } from 'react';
 import { fetchPublicContent } from '../services/api';
 import {
@@ -17,171 +18,82 @@ import {
   TestimonialsSection
 } from '../components/home';
 import { NoticeBanner } from '../components/ui';
+=======
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import usePublicContent from '../hooks/usePublicContent';
+
+const HERO_ROTATION_KEY = 'matrona-home-hero-rotation';
+
+const defaultHeroVisuals = [
+  {
+    id: 'default-hero-visual',
+    title: 'Laguna Salud',
+    description: 'Cuidado cercano, agenda simple y una experiencia visual limpia.',
+    imageUrl: '/hero-matrona.png'
+  }
+];
+
+const heroVariants = [
+  {
+    id: 'orbital',
+    label: 'Circular',
+    note: 'Composicion suave con atmosfera limpia y abierta.'
+  },
+  {
+    id: 'blob',
+    label: 'Organica',
+    note: 'Volumen amplio, bordes fluidos y una lectura minimalista.'
+  },
+  {
+    id: 'prism',
+    label: 'Triangular',
+    note: 'Recorte dinamico con acentos geometricos y mucho aire.'
+  },
+  {
+    id: 'frame',
+    label: 'Marco',
+    note: 'Capas suaves, profundidad ligera y protagonismo para la foto.'
+  }
+];
+
+const sectionLinks = [
+  { to: '/sobre-mi', label: 'Sobre mi' },
+  { to: '/servicios', label: 'Servicios' },
+  { to: '/comentarios', label: 'Comentarios' },
+  { to: '/contacto', label: 'Contacto' }
+];
+
+const getNextHeroSeed = () => {
+  if (typeof window === 'undefined') {
+    return 0;
+  }
+
+  try {
+    const storedValue = Number(window.sessionStorage.getItem(HERO_ROTATION_KEY) || '-1');
+    const nextValue = Number.isFinite(storedValue) ? storedValue + 1 : 0;
+    window.sessionStorage.setItem(HERO_ROTATION_KEY, String(nextValue));
+    return nextValue;
+  } catch (_error) {
+    return 0;
+  }
+};
+>>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
 
 export default function HomePage() {
-  const [content, setContent] = useState(fallbackContent);
-  const [activeSection, setActiveSection] = useState('inicio');
-  const [activeServiceIndex, setActiveServiceIndex] = useState(0);
-  const [galleryState, setGalleryState] = useState(null);
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [notice, setNotice] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchPublicContent()
-      .then((response) => {
-        if (cancelled) return;
-
-        setContent({
-          ...fallbackContent,
-          ...response,
-          hero: {
-            ...fallbackContent.hero,
-            ...response?.hero
-          }
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNotice('No se pudo cargar el contenido online, pero deje el home listo para seguir disenando.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const sections = document.querySelectorAll('[data-section-id]');
-
-    if (!sections.length || !('IntersectionObserver' in window)) return undefined;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-
-          entry.target.classList.add('visible');
-          setActiveSection(entry.target.dataset.sectionId || 'inicio');
-        });
-      },
-      {
-        threshold: 0.55,
-        rootMargin: '-16% 0px -28% 0px'
-      }
-    );
-
-    sections.forEach((section) => observer.observe(section));
-
-    return () => observer.disconnect();
-  }, [isLoading]);
-
-  useEffect(() => {
-    if (!notice) return undefined;
-
-    const timer = setTimeout(() => setNotice(''), 4500);
-    return () => clearTimeout(timer);
-  }, [notice]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveTestimonial((prev) => (prev + 1) % mockTestimonials.length);
-    }, 3400);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const services = mockServices;
-  const safeActiveServiceIndex = Math.min(activeServiceIndex, Math.max(services.length - 1, 0));
-  const activeService = services[safeActiveServiceIndex];
-  const activeServicePage = Math.floor(safeActiveServiceIndex / servicesPerPage);
-  const totalServicePages = Math.ceil(services.length / servicesPerPage);
-  const servicePageStart = activeServicePage * servicesPerPage;
-  const visibleServices = services.slice(servicePageStart, servicePageStart + servicesPerPage);
-  const openGalleryService = galleryState ? services[galleryState.serviceIndex] : null;
-  const activeGalleryImage = openGalleryService?.gallery?.[galleryState?.slideIndex || 0];
-
-  const handleNavClick = (sectionId) => {
-    setActiveSection(sectionId);
-    document.getElementById(sectionId)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
-  };
-
-  const getCardOffset = (index) => {
-    const total = mockTestimonials.length;
-    let offset = index - activeTestimonial;
-
-    if (offset > total / 2) offset -= total;
-    if (offset < -total / 2) offset += total;
-
-    return offset;
-  };
-
-  const handleServicePageChange = (direction) => {
-    const nextPage = (activeServicePage + direction + totalServicePages) % totalServicePages;
-    setActiveServiceIndex(nextPage * servicesPerPage);
-  };
-
-  const openServiceGallery = (serviceIndex, slideIndex = 0) => {
-    if (!services[serviceIndex]?.gallery?.length) return;
-
-    setGalleryState({
-      serviceIndex,
-      slideIndex
-    });
-  };
-
-  const closeServiceGallery = () => {
-    setGalleryState(null);
-  };
-
-  const moveGallery = (direction) => {
-    if (!openGalleryService?.gallery?.length) return;
-
-    setGalleryState((prev) => ({
-      ...prev,
-      slideIndex: (prev.slideIndex + direction + openGalleryService.gallery.length) % openGalleryService.gallery.length
-    }));
-  };
-
-  const handleServiceCardClick = (serviceIndex) => {
-    setActiveServiceIndex(serviceIndex);
-
-    if (services[serviceIndex]?.gallery?.length) {
-      openServiceGallery(serviceIndex, 0);
-    }
-  };
-
-  useEffect(() => {
-    if (activeServiceIndex >= services.length) {
-      setActiveServiceIndex(0);
-    }
-  }, [activeServiceIndex, services.length]);
-
-  useEffect(() => {
-    if (!galleryState) return undefined;
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') closeServiceGallery();
-      if (event.key === 'ArrowRight') moveGallery(1);
-      if (event.key === 'ArrowLeft') moveGallery(-1);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [galleryState, openGalleryService]);
-
-  if (isLoading) return <HomeSkeleton />;
+  const { content, statusMessage } = usePublicContent();
+  const [heroSeed] = useState(getNextHeroSeed);
+  const availableHeroVisuals = (content.gallery || []).filter((item) => item.imageUrl);
+  const heroVisuals = availableHeroVisuals.length ? availableHeroVisuals : defaultHeroVisuals;
+  const activeVariantIndex = heroSeed % heroVariants.length;
+  const activeVisualIndex = heroVisuals.length
+    ? (heroSeed * 2 + activeVariantIndex) % heroVisuals.length
+    : 0;
+  const activeVariant = heroVariants[activeVariantIndex];
+  const activeVisual = heroVisuals[activeVisualIndex] || defaultHeroVisuals[0];
 
   return (
+<<<<<<< HEAD
     <main className="clean-home">
       <HomeHeader navItems={navItems} activeSection={activeSection} onSelect={handleNavClick} />
 
@@ -229,5 +141,97 @@ export default function HomePage() {
 
       {notice ? <NoticeBanner className="clean-notice">{notice}</NoticeBanner> : null}
     </main>
+=======
+    <div className="home-page">
+      <section className={`hero-section hero-section-${activeVariant.id} section-shell`}>
+        <div className="hero-backdrop" aria-hidden="true">
+          <span className="hero-backdrop-orb hero-backdrop-orb-a" />
+          <span className="hero-backdrop-orb hero-backdrop-orb-b" />
+          <span className="hero-backdrop-orb hero-backdrop-orb-c" />
+        </div>
+
+        <div className="hero-copy">
+          <span className="section-tag">Laguna Salud</span>
+
+          <div className="hero-pills">
+            <span className="hero-pill">Hero rotativo</span>
+            <span className="hero-pill is-subtle">{activeVariant.label}</span>
+            {heroVisuals.length > 1 ? (
+              <span className="hero-pill is-subtle">
+                {activeVisualIndex + 1}/{heroVisuals.length} visuales
+              </span>
+            ) : null}
+          </div>
+
+          <h1>{content.hero.title}</h1>
+          <p>{content.hero.description}</p>
+
+          <div className="hero-actions">
+            <Link to="/reservar-hora" className="button button-primary">
+              Reservar hora
+            </Link>
+            <Link to="/servicios" className="button button-secondary">
+              Ver servicios
+            </Link>
+          </div>
+
+          {statusMessage ? <p className="status-note">{statusMessage}</p> : null}
+        </div>
+
+        <div className="hero-visual">
+          <div className="hero-composition">
+            <div className="hero-shape hero-shape-primary" />
+            <div className="hero-shape hero-shape-secondary" />
+
+            <div className={`hero-photo-shell hero-photo-shell-${activeVariant.id}`}>
+              <div className="hero-photo-accent hero-photo-accent-a" />
+              <div className="hero-photo-accent hero-photo-accent-b" />
+
+              <div className="hero-photo-mask">
+                <img
+                  src={activeVisual.imageUrl}
+                  alt={activeVisual.title || 'Profesional de la salud'}
+                  className="hero-image"
+                />
+              </div>
+            </div>
+
+            <div className="hero-note hero-note-top">
+              <span>Visual activo</span>
+              <strong>{activeVisual.title || 'Presentacion principal'}</strong>
+            </div>
+
+            <div className="hero-note hero-note-bottom">
+              <span>{activeVisual.description || activeVariant.note}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="flow-section section-shell">
+        <div className="flow-block">
+          <span className="flow-label">Paginas</span>
+          <div className="flow-links">
+            {sectionLinks.map((link) => (
+              <Link key={link.to} to={link.to} className="flow-link">
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="flow-block">
+          <span className="flow-label">Servicios</span>
+          <div className="service-line">
+            {(content.services || []).map((service) => (
+              <span key={service.id} className="service-chip">
+                {service.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+>>>>>>> 6096c9d95a01662a7c8dc7de58cb46e7ce8b34e7
   );
 }

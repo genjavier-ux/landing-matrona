@@ -1,23 +1,133 @@
 import { pool } from '../config/db.js';
+import {
+  fetchServicesWithImages,
+  normalizeServiceImagesInput,
+  replaceServiceImages
+} from '../utils/services.js';
+
+const isValidDateKey = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
 
 export const getDashboard = async (_req, res) => {
-  const [sections] = await pool.query(
-    'SELECT id, `key`, title, content FROM site_sections ORDER BY id'
-  );
-  const [services] = await pool.query(
-    'SELECT id, title, description, image_url AS imageUrl, is_active AS isActive, order_index AS orderIndex FROM services ORDER BY order_index, id'
-  );
-  const [testimonials] = await pool.query(
-    'SELECT id, patient_name_alias AS patientNameAlias, content, status, created_at AS createdAt FROM testimonials ORDER BY created_at DESC'
-  );
-  const [reviewCodes] = await pool.query(
-    'SELECT id, code, is_used AS isUsed, expires_at AS expiresAt, created_at AS createdAt FROM review_codes ORDER BY created_at DESC LIMIT 12'
-  );
+  const sectionsPromise = pool
+    .query('SELECT id, `key`, title, content FROM site_sections ORDER BY id')
+    .then(([rows]) => rows);
+  const servicesPromise = fetchServicesWithImages();
+  const testimonialsPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          patient_name_alias AS patientNameAlias,
+          content,
+          rating,
+          is_visible AS isVisible,
+          status,
+          created_at AS createdAt
+        FROM testimonials
+        ORDER BY created_at DESC
+      `
+    )
+    .then(([rows]) => rows);
+  const galleryPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          title,
+          description,
+          image_url AS imageUrl,
+          is_active AS isActive,
+          order_index AS orderIndex
+        FROM gallery_items
+        ORDER BY order_index, id
+      `
+    )
+    .then(([rows]) => rows);
+  const weeklyAvailabilityPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          day_of_week AS dayOfWeek,
+          is_enabled AS isEnabled,
+          start_time AS startTime,
+          end_time AS endTime,
+          slot_minutes AS slotMinutes
+        FROM weekly_availability
+        ORDER BY day_of_week
+      `
+    )
+    .then(([rows]) => rows);
+  const appointmentsPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        ORDER BY preferred_date DESC, preferred_time DESC
+        LIMIT 30
+      `
+    )
+    .then(([rows]) => rows);
+  const reviewCodesPromise = pool
+    .query(
+      `
+        SELECT
+          id,
+          code,
+          is_used AS isUsed,
+          expires_at AS expiresAt,
+          created_at AS createdAt
+        FROM review_codes
+        ORDER BY created_at DESC
+        LIMIT 12
+      `
+    )
+    .then(([rows]) => rows);
+
+  const [sections, services, testimonials, gallery, weeklyAvailability, appointments, reviewCodes] =
+    await Promise.all([
+      sectionsPromise,
+      servicesPromise,
+      testimonialsPromise,
+      galleryPromise,
+      weeklyAvailabilityPromise,
+      appointmentsPromise,
+      reviewCodesPromise
+    ]);
 
   return res.json({
     sections,
     services,
     testimonials,
+    gallery,
+    weeklyAvailability,
+    appointments,
     reviewCodes
   });
 };
@@ -41,42 +151,376 @@ export const updateSection = async (req, res) => {
 };
 
 export const createService = async (req, res) => {
-  const { title, description, imageUrl } = req.body;
+  const { title, description, price, currency, durationMinutes, isActive, orderIndex, images } =
+    req.body;
+
+  if (!title || !description) {
+    return res.status(400).json({ message: 'El servicio debe tener titulo y descripcion.' });
+  }
+
+  if (Array.isArray(images) && images.length > 10) {
+    return res.status(400).json({ message: 'Cada servicio admite un maximo de 10 imagenes.' });
+  }
+
+  const normalizedImages = normalizeServiceImagesInput(images);
 
   const [[{ nextOrderIndex }]] = await pool.query(
     'SELECT COALESCE(MAX(order_index), 0) + 1 AS nextOrderIndex FROM services'
   );
 
-  const [result] = await pool.query(
-    `
-      INSERT INTO services (title, description, image_url, order_index)
-      VALUES (?, ?, ?, ?)
-    `,
-    [title, description, imageUrl || null, nextOrderIndex]
-  );
+  const connection = await pool.getConnection();
 
-  return res.status(201).json({
-    id: result.insertId,
-    message: 'Servicio creado.'
-  });
+  try {
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
+      `
+        INSERT INTO services (
+          title,
+          description,
+          price,
+          currency,
+          duration_minutes,
+          image_url,
+          is_active,
+          order_index
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        title,
+        description,
+        Number(price || 0),
+        currency || 'CLP',
+        Number(durationMinutes || 60),
+        null,
+        isActive === undefined ? 1 : Number(Boolean(isActive)),
+        Number(orderIndex || nextOrderIndex)
+      ]
+    );
+
+    await replaceServiceImages(connection, result.insertId, normalizedImages);
+    await connection.commit();
+
+    return res.status(201).json({
+      id: result.insertId,
+      message: 'Servicio creado.'
+    });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const updateService = async (req, res) => {
   const { id } = req.params;
-  const { title, description, imageUrl } = req.body;
+  const { title, description, price, currency, durationMinutes, isActive, orderIndex, images } =
+    req.body;
 
-  await pool.query(
-    'UPDATE services SET title = ?, description = ?, image_url = ? WHERE id = ?',
-    [title, description, imageUrl, id]
-  );
+  if (Array.isArray(images) && images.length > 10) {
+    return res.status(400).json({ message: 'Cada servicio admite un maximo de 10 imagenes.' });
+  }
+
+  const normalizedImages = normalizeServiceImagesInput(images);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.query(
+      `
+        UPDATE services
+        SET
+          title = ?,
+          description = ?,
+          price = ?,
+          currency = ?,
+          duration_minutes = ?,
+          image_url = ?,
+          is_active = ?,
+          order_index = ?
+        WHERE id = ?
+      `,
+      [
+        title,
+        description,
+        Number(price || 0),
+        currency || 'CLP',
+        Number(durationMinutes || 60),
+        null,
+        Number(Boolean(isActive)),
+        Number(orderIndex || 0),
+        id
+      ]
+    );
+
+    await replaceServiceImages(connection, id, normalizedImages);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 
   return res.json({ message: 'Servicio actualizado.' });
 };
 
 export const deleteService = async (req, res) => {
   const { id } = req.params;
+  await pool.query('DELETE FROM service_images WHERE service_id = ?', [id]);
   await pool.query('DELETE FROM services WHERE id = ?', [id]);
   return res.json({ message: 'Servicio eliminado.' });
+};
+
+export const createGalleryItem = async (req, res) => {
+  const { title, description, imageUrl, isActive, orderIndex } = req.body;
+
+  if (!title || !imageUrl) {
+    return res.status(400).json({ message: 'La galeria requiere titulo e imagen.' });
+  }
+
+  const [[{ nextOrderIndex }]] = await pool.query(
+    'SELECT COALESCE(MAX(order_index), 0) + 1 AS nextOrderIndex FROM gallery_items'
+  );
+
+  const [result] = await pool.query(
+    `
+      INSERT INTO gallery_items (title, description, image_url, is_active, order_index)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [
+      title,
+      description || null,
+      imageUrl,
+      isActive === undefined ? 1 : Number(Boolean(isActive)),
+      Number(orderIndex || nextOrderIndex)
+    ]
+  );
+
+  return res.status(201).json({
+    id: result.insertId,
+    message: 'Elemento de galeria creado.'
+  });
+};
+
+export const updateGalleryItem = async (req, res) => {
+  const { id } = req.params;
+  const { title, description, imageUrl, isActive, orderIndex } = req.body;
+
+  await pool.query(
+    `
+      UPDATE gallery_items
+      SET
+        title = ?,
+        description = ?,
+        image_url = ?,
+        is_active = ?,
+        order_index = ?
+      WHERE id = ?
+    `,
+    [title, description || null, imageUrl, Number(Boolean(isActive)), Number(orderIndex || 0), id]
+  );
+
+  return res.json({ message: 'Elemento de galeria actualizado.' });
+};
+
+export const deleteGalleryItem = async (req, res) => {
+  const { id } = req.params;
+  await pool.query('DELETE FROM gallery_items WHERE id = ?', [id]);
+  return res.json({ message: 'Elemento de galeria eliminado.' });
+};
+
+export const getWeeklyAvailability = async (_req, res) => {
+  const [rows] = await pool.query(
+    `
+      SELECT
+        id,
+        day_of_week AS dayOfWeek,
+        is_enabled AS isEnabled,
+        start_time AS startTime,
+        end_time AS endTime,
+        slot_minutes AS slotMinutes
+      FROM weekly_availability
+      ORDER BY day_of_week
+    `
+  );
+
+  return res.json(rows);
+};
+
+export const upsertWeeklyAvailability = async (req, res) => {
+  const { availability } = req.body;
+
+  if (!Array.isArray(availability) || !availability.length) {
+    return res.status(400).json({ message: 'Debes enviar una lista de disponibilidad.' });
+  }
+
+  for (const item of availability) {
+    const { dayOfWeek, isEnabled, startTime, endTime, slotMinutes } = item;
+
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      return res.status(400).json({ message: 'dayOfWeek debe estar entre 0 y 6.' });
+    }
+
+    await pool.query(
+      `
+        INSERT INTO weekly_availability (
+          day_of_week,
+          is_enabled,
+          start_time,
+          end_time,
+          slot_minutes
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          is_enabled = VALUES(is_enabled),
+          start_time = VALUES(start_time),
+          end_time = VALUES(end_time),
+          slot_minutes = VALUES(slot_minutes)
+      `,
+      [
+        dayOfWeek,
+        Number(Boolean(isEnabled)),
+        isEnabled ? startTime : null,
+        isEnabled ? endTime : null,
+        Number(slotMinutes || 60)
+      ]
+    );
+  }
+
+  return res.json({ message: 'Disponibilidad semanal actualizada.' });
+};
+
+export const getAppointments = async (req, res) => {
+  const { from, to } = req.query;
+  const hasRange = Boolean(from || to);
+
+  if (hasRange && (!from || !to)) {
+    return res.status(400).json({ message: 'Debes enviar from y to para filtrar por rango.' });
+  }
+
+  if (hasRange && (!isValidDateKey(from) || !isValidDateKey(to) || from > to)) {
+    return res.status(400).json({ message: 'El rango de fechas no es valido.' });
+  }
+
+  const query = hasRange
+    ? `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        WHERE preferred_date BETWEEN ? AND ?
+        ORDER BY preferred_date ASC, preferred_time ASC
+      `
+    : `
+        SELECT
+          id,
+          full_name AS fullName,
+          email,
+          phone,
+          service_id AS serviceId,
+          service_name AS serviceName,
+          DATE_FORMAT(preferred_date, '%Y-%m-%d') AS preferredDate,
+          TIME_FORMAT(preferred_time, '%H:%i') AS preferredTime,
+          TIME_FORMAT(end_time, '%H:%i') AS endTime,
+          slot_minutes AS slotMinutes,
+          notes,
+          status,
+          created_at AS createdAt
+        FROM appointments
+        ORDER BY preferred_date DESC, preferred_time DESC
+      `;
+  const params = hasRange ? [from, to] : [];
+  const [rows] = await pool.query(query, params);
+
+  return res.json(rows);
+};
+
+export const updateAppointmentStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const allowedStatuses = ['new', 'confirmed', 'completed', 'cancelled'];
+
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ message: 'Estado de reserva no valido.' });
+  }
+
+  await pool.query('UPDATE appointments SET status = ? WHERE id = ?', [status, id]);
+  return res.json({ message: 'Estado de la reserva actualizado.' });
+};
+
+export const createAdminTestimonial = async (req, res) => {
+  const { patientNameAlias, content, rating, status, isVisible } = req.body;
+
+  if (!patientNameAlias || !content) {
+    return res.status(400).json({ message: 'El comentario requiere alias y contenido.' });
+  }
+
+  const safeRating = Number(rating || 5);
+  const safeStatus = ['pending', 'approved', 'rejected'].includes(status) ? status : 'approved';
+
+  if (!Number.isInteger(safeRating) || safeRating < 1 || safeRating > 5) {
+    return res.status(400).json({ message: 'La puntuacion debe estar entre 1 y 5 estrellas.' });
+  }
+
+  const [result] = await pool.query(
+    `
+      INSERT INTO testimonials (patient_name_alias, content, rating, is_visible, status)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [patientNameAlias, content, safeRating, Number(Boolean(isVisible ?? true)), safeStatus]
+  );
+
+  return res.status(201).json({
+    id: result.insertId,
+    message: 'Comentario creado.'
+  });
+};
+
+export const updateAdminTestimonial = async (req, res) => {
+  const { id } = req.params;
+  const { patientNameAlias, content, rating, status, isVisible } = req.body;
+
+  if (!patientNameAlias || !content) {
+    return res.status(400).json({ message: 'El comentario requiere alias y contenido.' });
+  }
+
+  const safeRating = Number(rating || 5);
+  const safeStatus = ['pending', 'approved', 'rejected'].includes(status) ? status : 'pending';
+
+  if (!Number.isInteger(safeRating) || safeRating < 1 || safeRating > 5) {
+    return res.status(400).json({ message: 'La puntuacion debe estar entre 1 y 5 estrellas.' });
+  }
+
+  await pool.query(
+    `
+      UPDATE testimonials
+      SET
+        patient_name_alias = ?,
+        content = ?,
+        rating = ?,
+        is_visible = ?,
+        status = ?
+      WHERE id = ?
+    `,
+    [patientNameAlias, content, safeRating, Number(Boolean(isVisible)), safeStatus, id]
+  );
+
+  return res.json({ message: 'Comentario actualizado.' });
 };
 
 export const deleteTestimonial = async (req, res) => {
@@ -91,8 +535,23 @@ export const approveTestimonial = async (req, res) => {
   return res.json({ message: 'Comentario aprobado.' });
 };
 
+export const updateTestimonialVisibility = async (req, res) => {
+  const { id } = req.params;
+  const { isVisible } = req.body;
+
+  await pool.query('UPDATE testimonials SET is_visible = ? WHERE id = ?', [
+    Number(Boolean(isVisible)),
+    id
+  ]);
+
+  return res.json({ message: 'Visibilidad del comentario actualizada.' });
+};
+
 export const generateReviewCode = async (req, res) => {
   const { code, expiresAt } = req.body;
-  await pool.query('INSERT INTO review_codes (code, expires_at) VALUES (?, ?)', [code, expiresAt || null]);
-  return res.status(201).json({ message: 'Código creado.' });
+  await pool.query('INSERT INTO review_codes (code, expires_at) VALUES (?, ?)', [
+    code,
+    expiresAt || null
+  ]);
+  return res.status(201).json({ message: 'Codigo creado.' });
 };
