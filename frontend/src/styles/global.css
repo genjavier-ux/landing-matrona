@@ -360,6 +360,641 @@ img {
   width: 100%;
 }
 
+.presentation-home {
+  display: grid;
+  gap: clamp(1.4rem, 3vw, 2.4rem);
+  padding-bottom: var(--space-8);
+}
+
+.presentation-hero,
+.presentation-signal,
+.presentation-story,
+.presentation-services,
+.presentation-testimonials,
+.presentation-cta {
+  position: relative;
+}
+
+.presentation-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.96fr) minmax(340px, 0.88fr);
+  align-items: center;
+  gap: clamp(1.8rem, 5vw, 4.8rem);
+  padding-top: clamp(2.6rem, 7vw, 5.8rem);
+  padding-bottom: clamp(1.2rem, 3vw, 2.4rem);
+}
+
+.presentation-hero::before,
+.presentation-cta-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.presentation-hero::before {
+  border-radius: 40px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 214, 222, 0.72), transparent 30%),
+    radial-gradient(circle at 88% 16%, rgba(198, 241, 232, 0.48), transparent 24%),
+    linear-gradient(135deg, rgba(255, 252, 252, 0.92), rgba(252, 243, 246, 0.88));
+  filter: saturate(112%);
+}
+
+.presentation-hero-copy,
+.presentation-hero-media {
+  position: relative;
+  z-index: 1;
+}
+
+.presentation-hero-copy {
+  display: grid;
+  gap: 1.35rem;
+  max-width: 42rem;
+  animation: home-rise 720ms ease both;
+}
+
+.presentation-hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.presentation-hero-kicker-line {
+  width: 64px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(212, 103, 130, 0.28), rgba(212, 103, 130, 0.82));
+  box-shadow: 0 10px 22px rgba(187, 79, 107, 0.16);
+}
+
+.presentation-hero-kicker p,
+.presentation-summary-card p,
+.presentation-signal-card p,
+.presentation-story-support,
+.presentation-testimonial-card p,
+.presentation-cta-copy p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.78;
+}
+
+.presentation-hero-copy h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(3.3rem, 7vw, 6.2rem);
+  line-height: 0.92;
+  letter-spacing: -0.07em;
+}
+
+.presentation-hero-description {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+  color: var(--color-text-muted);
+  line-height: 1.9;
+}
+
+.presentation-hero-summary,
+.presentation-hero-metrics,
+.presentation-signal,
+.presentation-service-grid,
+.presentation-testimonial-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.presentation-hero-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.presentation-summary-card,
+.presentation-signal-card,
+.presentation-story-card,
+.presentation-service-card,
+.presentation-testimonial-card,
+.presentation-photo-card,
+.presentation-photo-thumb,
+.presentation-photo-note,
+.presentation-metric-card {
+  border: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.18));
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--shadow-glass);
+}
+
+.presentation-summary-card,
+.presentation-signal-card,
+.presentation-story-card,
+.presentation-testimonial-card,
+.presentation-metric-card {
+  display: grid;
+}
+
+.presentation-summary-card,
+.presentation-signal-card,
+.presentation-metric-card {
+  padding: 1.1rem 1.15rem;
+  border-radius: 28px;
+}
+
+.presentation-summary-card {
+  gap: 0.5rem;
+}
+
+.presentation-summary-card strong,
+.presentation-signal-card strong,
+.presentation-metric-card strong,
+.presentation-photo-card strong,
+.presentation-photo-note strong {
+  font-size: 1.04rem;
+  line-height: 1.35;
+}
+
+.presentation-summary-card.is-soft {
+  background: linear-gradient(180deg, rgba(255, 241, 245, 0.54), rgba(255, 255, 255, 0.18));
+}
+
+.presentation-hero-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.presentation-metric-card {
+  gap: 0.2rem;
+  min-height: 108px;
+  align-content: end;
+}
+
+.presentation-metric-card strong {
+  font-size: clamp(1.2rem, 2.4vw, 1.8rem);
+  line-height: 1;
+}
+
+.presentation-metric-card span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.presentation-hero-media {
+  animation: home-rise 880ms ease both;
+}
+
+.presentation-photo-stage {
+  position: relative;
+  min-height: 700px;
+}
+
+.presentation-photo-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.presentation-photo-glow.is-primary {
+  right: 8%;
+  top: 4%;
+  width: clamp(200px, 22vw, 320px);
+  height: clamp(200px, 22vw, 320px);
+  background: rgba(232, 152, 177, 0.32);
+}
+
+.presentation-photo-glow.is-secondary {
+  left: 4%;
+  bottom: 16%;
+  width: clamp(140px, 16vw, 220px);
+  height: clamp(140px, 16vw, 220px);
+  background: rgba(193, 234, 225, 0.34);
+}
+
+.presentation-photo-card {
+  position: absolute;
+  top: 3%;
+  right: 0;
+  width: min(100%, 540px);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 38px;
+  animation: home-float-soft 10s ease-in-out infinite;
+}
+
+.presentation-photo-card-top {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.presentation-photo-card-top p,
+.presentation-photo-thumb span {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.68;
+}
+
+.presentation-photo-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  border-radius: 30px 30px 126px 30px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    linear-gradient(145deg, rgba(243, 217, 225, 0.72), rgba(255, 255, 255, 0.24));
+}
+
+.presentation-photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.presentation-photo-note {
+  position: absolute;
+  z-index: 2;
+  gap: 0.3rem;
+  max-width: 240px;
+  padding: 1rem 1.05rem;
+  border-radius: 24px;
+}
+
+.presentation-photo-note.is-top {
+  top: 7%;
+  left: 0;
+}
+
+.presentation-photo-note.is-bottom {
+  right: 2%;
+  bottom: 11%;
+}
+
+.presentation-photo-rail {
+  position: absolute;
+  left: 0;
+  bottom: 3%;
+  display: grid;
+  gap: 0.8rem;
+  width: min(100%, 280px);
+}
+
+.presentation-photo-thumb {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.7rem;
+  border-radius: 22px;
+}
+
+.presentation-photo-thumb img {
+  width: 74px;
+  height: 74px;
+  border-radius: 18px;
+  object-fit: cover;
+}
+
+.presentation-photo-thumb div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.presentation-photo-thumb strong {
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.presentation-signal {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.presentation-signal-card {
+  gap: 0.55rem;
+  padding: 1.2rem;
+  border-radius: 30px;
+}
+
+.presentation-story-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr);
+  gap: 1rem;
+}
+
+.presentation-story-card {
+  gap: 1rem;
+  padding: 1.35rem;
+  border-radius: 34px;
+}
+
+.presentation-story-card.is-accent {
+  background:
+    radial-gradient(circle at top right, rgba(255, 232, 238, 0.78), transparent 34%),
+    linear-gradient(180deg, rgba(255, 247, 249, 0.72), rgba(255, 255, 255, 0.18));
+}
+
+.presentation-story-card h2,
+.presentation-section-head h2,
+.presentation-cta-copy h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: -0.05em;
+}
+
+.presentation-story-card h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.98;
+}
+
+.presentation-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: auto;
+}
+
+.presentation-service-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.presentation-service-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.presentation-service-list-item.is-empty {
+  grid-template-columns: 1fr;
+}
+
+.presentation-service-list-item div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.presentation-service-list-item span {
+  color: var(--color-text-muted);
+}
+
+.presentation-service-index,
+.presentation-service-price {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.presentation-service-index {
+  min-width: 42px;
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--color-brand-strong);
+}
+
+.presentation-service-price {
+  padding: 0 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--color-text);
+}
+
+.presentation-services,
+.presentation-testimonials {
+  padding-top: var(--space-2);
+}
+
+.presentation-section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.presentation-section-head > div {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 44rem;
+}
+
+.presentation-section-head h2 {
+  font-size: clamp(2rem, 4.4vw, 3.4rem);
+  line-height: 0.94;
+}
+
+.presentation-section-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.8;
+}
+
+.presentation-service-grid,
+.presentation-testimonial-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.presentation-service-card {
+  align-content: start;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 30px;
+  transition: transform var(--transition-base), border-color var(--transition-base);
+}
+
+.presentation-service-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(212, 103, 130, 0.34);
+}
+
+.presentation-service-card.is-empty {
+  min-height: 240px;
+}
+
+.presentation-service-image-shell {
+  overflow: hidden;
+  border-radius: 24px;
+  aspect-ratio: 4 / 3;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.presentation-service-image-shell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms ease;
+}
+
+.presentation-service-card:hover .presentation-service-image-shell img {
+  transform: scale(1.04);
+}
+
+.presentation-service-copy {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.presentation-service-copy strong {
+  font-size: 1.14rem;
+  line-height: 1.35;
+}
+
+.presentation-service-copy p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.75;
+}
+
+.presentation-service-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.presentation-service-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.44);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.presentation-service-action {
+  width: 100%;
+}
+
+.presentation-testimonial-card {
+  gap: 1rem;
+  padding: 1.2rem;
+  border-radius: 30px;
+  min-height: 260px;
+  align-content: space-between;
+}
+
+.presentation-testimonial-stars {
+  display: flex;
+  gap: 0.28rem;
+  color: rgba(127, 104, 112, 0.28);
+}
+
+.presentation-testimonial-stars .is-filled {
+  color: var(--color-brand);
+}
+
+.presentation-testimonial-card p {
+  font-size: 1rem;
+}
+
+.presentation-testimonial-card strong {
+  font-size: 0.98rem;
+}
+
+.presentation-cta-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.2rem;
+  align-items: center;
+  overflow: hidden;
+  padding: 1.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 36px;
+  background: linear-gradient(140deg, rgba(255, 249, 251, 0.72), rgba(255, 255, 255, 0.2));
+  box-shadow: var(--shadow-glass);
+}
+
+.presentation-cta-card::before {
+  background:
+    radial-gradient(circle at top right, rgba(232, 152, 177, 0.24), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(193, 234, 225, 0.2), transparent 24%);
+}
+
+.presentation-cta-copy,
+.presentation-cta-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.presentation-cta-copy {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 44rem;
+}
+
+.presentation-cta-copy h2 {
+  font-size: clamp(1.9rem, 4vw, 3.2rem);
+  line-height: 0.96;
+}
+
+.presentation-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+:root[data-theme='dark'] .presentation-hero::before {
+  background:
+    radial-gradient(circle at top left, rgba(212, 103, 130, 0.16), transparent 30%),
+    radial-gradient(circle at 88% 16%, rgba(135, 201, 191, 0.14), transparent 24%),
+    linear-gradient(135deg, rgba(32, 20, 26, 0.9), rgba(20, 13, 17, 0.86));
+}
+
+:root[data-theme='dark'] .presentation-summary-card,
+:root[data-theme='dark'] .presentation-signal-card,
+:root[data-theme='dark'] .presentation-story-card,
+:root[data-theme='dark'] .presentation-service-card,
+:root[data-theme='dark'] .presentation-testimonial-card,
+:root[data-theme='dark'] .presentation-photo-card,
+:root[data-theme='dark'] .presentation-photo-thumb,
+:root[data-theme='dark'] .presentation-photo-note,
+:root[data-theme='dark'] .presentation-metric-card,
+:root[data-theme='dark'] .presentation-cta-card {
+  background: linear-gradient(180deg, rgba(58, 33, 45, 0.54), rgba(28, 16, 22, 0.34));
+}
+
+:root[data-theme='dark'] .presentation-service-list-item,
+:root[data-theme='dark'] .presentation-service-badge,
+:root[data-theme='dark'] .presentation-service-price,
+:root[data-theme='dark'] .presentation-service-index {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes home-float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
 .hero-section {
   position: relative;
   isolation: isolate;
@@ -3377,6 +4012,8 @@ button.booking-slot-row:hover {
 }
 
 @media (max-width: 1080px) {
+  .presentation-hero,
+  .presentation-story-grid,
   .hero-section,
   .content-page-grid,
   .form-layout,
@@ -3384,6 +4021,53 @@ button.booking-slot-row:hover {
   .dual-panel,
   .admin-shell {
     grid-template-columns: 1fr;
+  }
+
+  .presentation-hero-summary,
+  .presentation-service-grid,
+  .presentation-testimonial-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .presentation-signal {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .presentation-photo-stage {
+    min-height: 0;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .presentation-photo-card,
+  .presentation-photo-rail {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+  }
+
+  .presentation-photo-note.is-top {
+    left: 1rem;
+  }
+
+  .presentation-photo-note.is-bottom {
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .presentation-photo-rail {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .presentation-cta-card {
+    grid-template-columns: 1fr;
+  }
+
+  .presentation-cta-actions {
+    justify-content: flex-start;
   }
 
   .admin-app-shell {
@@ -3466,6 +4150,50 @@ button.booking-slot-row:hover {
 }
 
 @media (max-width: 840px) {
+  .presentation-signal,
+  .presentation-service-grid,
+  .presentation-testimonial-grid,
+  .presentation-hero-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .presentation-hero-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .presentation-section-head,
+  .presentation-photo-thumb,
+  .presentation-cta-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .presentation-section-head {
+    display: flex;
+  }
+
+  .presentation-photo-note {
+    position: relative;
+    max-width: none;
+  }
+
+  .presentation-photo-note.is-top,
+  .presentation-photo-note.is-bottom {
+    inset: auto;
+  }
+
+  .presentation-photo-thumb {
+    grid-template-columns: 1fr;
+  }
+
+  .presentation-service-list-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .presentation-service-price {
+    justify-self: start;
+  }
+
   .comments-page {
     grid-template-rows: auto auto;
   }
@@ -3639,6 +4367,46 @@ button.booking-slot-row:hover {
 }
 
 @media (max-width: 600px) {
+  .presentation-hero {
+    padding-top: 2rem;
+  }
+
+  .presentation-hero-copy h1,
+  .presentation-section-head h2,
+  .presentation-cta-copy h2 {
+    font-size: clamp(2.4rem, 12vw, 3.7rem);
+  }
+
+  .presentation-summary-card,
+  .presentation-signal-card,
+  .presentation-story-card,
+  .presentation-service-card,
+  .presentation-testimonial-card,
+  .presentation-photo-card,
+  .presentation-photo-note,
+  .presentation-metric-card,
+  .presentation-cta-card {
+    padding: 1rem;
+    border-radius: 26px;
+  }
+
+  .presentation-photo-card {
+    gap: 0.85rem;
+  }
+
+  .presentation-photo-frame {
+    border-radius: 24px 24px 72px 24px;
+  }
+
+  .presentation-photo-thumb img {
+    width: 100%;
+    height: 180px;
+  }
+
+  .presentation-service-list-item {
+    grid-template-columns: 1fr;
+  }
+
   .content-page-copy h1 {
     font-size: clamp(2.2rem, 12vw, 3rem);
   }
@@ -3804,8 +4572,15 @@ button.booking-slot-row:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .testimonial-card-surface {
+  .testimonial-card-surface,
+  .presentation-hero-copy,
+  .presentation-hero-media,
+  .presentation-photo-card {
     animation: none;
+  }
+
+  .presentation-service-image-shell img {
+    transition: none;
   }
 }
 

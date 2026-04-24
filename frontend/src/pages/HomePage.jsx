@@ -1,162 +1,169 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import usePublicContent from '../hooks/usePublicContent';
 
-const HERO_ROTATION_KEY = 'matrona-home-hero-rotation';
-
-const defaultHeroVisuals = [
-  {
-    id: 'default-hero-visual',
-    title: 'Laguna Salud',
-    description: 'Cuidado cercano, agenda simple y una experiencia visual limpia.',
-    imageUrl: '/hero-matrona.png'
-  }
-];
-
-const heroVariants = [
-  {
-    id: 'orbital',
-    label: 'Circular',
-    note: 'Composicion suave con atmosfera limpia y abierta.'
-  },
-  {
-    id: 'blob',
-    label: 'Organica',
-    note: 'Volumen amplio, bordes fluidos y una lectura minimalista.'
-  },
-  {
-    id: 'prism',
-    label: 'Triangular',
-    note: 'Recorte dinamico con acentos geometricos y mucho aire.'
-  },
-  {
-    id: 'frame',
-    label: 'Marco',
-    note: 'Capas suaves, profundidad ligera y protagonismo para la foto.'
-  }
-];
-
-const sectionLinks = [
-  { to: '/sobre-mi', label: 'Sobre mi' },
-  { to: '/servicios', label: 'Servicios' },
-  { to: '/comentarios', label: 'Comentarios' },
-  { to: '/contacto', label: 'Contacto' }
-];
-
-const getNextHeroSeed = () => {
-  if (typeof window === 'undefined') {
-    return 0;
-  }
-
-  try {
-    const storedValue = Number(window.sessionStorage.getItem(HERO_ROTATION_KEY) || '-1');
-    const nextValue = Number.isFinite(storedValue) ? storedValue + 1 : 0;
-    window.sessionStorage.setItem(HERO_ROTATION_KEY, String(nextValue));
-    return nextValue;
-  } catch (_error) {
-    return 0;
-  }
+const defaultPortrait = {
+  id: 'default-portrait',
+  title: 'Presentacion principal',
+  description: 'La primera foto activa que suba la usuaria se usa aqui como retrato principal.',
+  imageUrl: '/hero-matrona.png'
 };
+
+const splitParagraphs = (value) =>
+  String(value || '')
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const truncateText = (value, maxLength = 160) => {
+  const safeValue = String(value || '').trim();
+
+  if (safeValue.length <= maxLength) {
+    return safeValue;
+  }
+
+  return `${safeValue.slice(0, maxLength).trimEnd()}...`;
+};
+
+const formatCountLabel = (count, singular, plural) =>
+  `${count} ${count === 1 ? singular : plural}`;
 
 export default function HomePage() {
   const { content, statusMessage } = usePublicContent();
-  const [heroSeed] = useState(getNextHeroSeed);
-  const availableHeroVisuals = (content.gallery || []).filter((item) => item.imageUrl);
-  const heroVisuals = availableHeroVisuals.length ? availableHeroVisuals : defaultHeroVisuals;
-  const activeVariantIndex = heroSeed % heroVariants.length;
-  const activeVisualIndex = heroVisuals.length
-    ? (heroSeed * 2 + activeVariantIndex) % heroVisuals.length
-    : 0;
-  const activeVariant = heroVariants[activeVariantIndex];
-  const activeVisual = heroVisuals[activeVisualIndex] || defaultHeroVisuals[0];
+  const aboutSection = content.sections.about;
+  const bookingSection = content.sections.booking;
+
+  const portraitGallery = (content.gallery || []).filter((item) => item.imageUrl);
+  const primaryPortrait = portraitGallery[0] || defaultPortrait;
+  const portraitHighlights = portraitGallery.slice(1, 4);
+
+  const aboutParagraphs = splitParagraphs(aboutSection.content);
+  const aboutLead =
+    aboutParagraphs[0] ||
+    'Acompanamiento profesional con una mirada cercana, clara y humana en cada etapa.';
+  const aboutSupport =
+    aboutParagraphs[1] ||
+    'La home funciona como una presentacion directa para mostrar rostro, estilo de atencion y servicios principales.';
+  const bookingPreview =
+    splitParagraphs(bookingSection.content)[0] ||
+    'Selecciona dia y horario disponible desde una agenda conectada con la disponibilidad real.';
+
+  const enabledBookingDays = (content.weeklyAvailability || []).length;
+
+  const quickMetrics = [
+    {
+      value: formatCountLabel(content.services.length, 'servicio', 'servicios'),
+      label: 'activos'
+    },
+    {
+      value: formatCountLabel(content.testimonials.length, 'testimonio', 'testimonios'),
+      label: 'visibles'
+    },
+    {
+      value: enabledBookingDays ? formatCountLabel(enabledBookingDays, 'dia', 'dias') : 'Agenda',
+      label: enabledBookingDays ? 'con reserva online' : 'online disponible'
+    }
+  ];
 
   return (
-    <div className="home-page">
-      <section className={`hero-section hero-section-${activeVariant.id} section-shell`}>
-        <div className="hero-backdrop" aria-hidden="true">
-          <span className="hero-backdrop-orb hero-backdrop-orb-a" />
-          <span className="hero-backdrop-orb hero-backdrop-orb-b" />
-          <span className="hero-backdrop-orb hero-backdrop-orb-c" />
-        </div>
+    <div className="home-page presentation-home">
+      <section className="presentation-hero section-shell">
+        <div className="presentation-hero-copy">
+          <span className="section-tag">Presentacion</span>
 
-        <div className="hero-copy">
-          <span className="section-tag">Laguna Salud</span>
-
-          <div className="hero-pills">
-            <span className="hero-pill">Hero rotativo</span>
-            <span className="hero-pill is-subtle">{activeVariant.label}</span>
-            {heroVisuals.length > 1 ? (
-              <span className="hero-pill is-subtle">
-                {activeVisualIndex + 1}/{heroVisuals.length} visuales
-              </span>
-            ) : null}
+          <div className="presentation-hero-kicker">
+            <span className="presentation-hero-kicker-line" aria-hidden="true" />
+            <p>Atencion cercana, clara y con una imagen principal editable desde el panel</p>
           </div>
 
           <h1>{content.hero.title}</h1>
-          <p>{content.hero.description}</p>
+          <p className="presentation-hero-description">{content.hero.description}</p>
+
+          <div className="presentation-hero-summary">
+            <article className="presentation-summary-card">
+              <span className="flow-label">Sobre mi</span>
+              <strong>{aboutSection.title}</strong>
+              <p>{truncateText(aboutLead, 150)}</p>
+            </article>
+
+            <article className="presentation-summary-card is-soft">
+              <span className="flow-label">Reserva</span>
+              <strong>
+                {enabledBookingDays
+                  ? `${enabledBookingDays} dias con agenda online`
+                  : 'Agenda online disponible'}
+              </strong>
+              <p>{truncateText(bookingPreview, 150)}</p>
+            </article>
+          </div>
 
           <div className="hero-actions">
             <Link to="/reservar-hora" className="button button-primary">
               Reservar hora
             </Link>
-            <Link to="/servicios" className="button button-secondary">
-              Ver servicios
+            <Link to="/contacto" className="button button-secondary">
+              Ir a contacto
             </Link>
+          </div>
+
+          <div className="presentation-hero-metrics" aria-label="Resumen del sitio">
+            {quickMetrics.map((metric) => (
+              <article key={`${metric.value}-${metric.label}`} className="presentation-metric-card">
+                <strong>{metric.value}</strong>
+                <span>{metric.label}</span>
+              </article>
+            ))}
           </div>
 
           {statusMessage ? <p className="status-note">{statusMessage}</p> : null}
         </div>
 
-        <div className="hero-visual">
-          <div className="hero-composition">
-            <div className="hero-shape hero-shape-primary" />
-            <div className="hero-shape hero-shape-secondary" />
+        <div className="presentation-hero-media">
+          <div className="presentation-photo-stage">
+            <span className="presentation-photo-glow is-primary" aria-hidden="true" />
+            <span className="presentation-photo-glow is-secondary" aria-hidden="true" />
 
-            <div className={`hero-photo-shell hero-photo-shell-${activeVariant.id}`}>
-              <div className="hero-photo-accent hero-photo-accent-a" />
-              <div className="hero-photo-accent hero-photo-accent-b" />
+            <article className="presentation-photo-card">
+              <div className="presentation-photo-card-top">
+                <span className="flow-label">Foto principal</span>
+                <strong>{primaryPortrait.title || 'Retrato subido por la usuaria'}</strong>
+                <p>
+                  {primaryPortrait.description ||
+                    'La primera imagen activa del hero se muestra aqui como retrato de presentacion.'}
+                </p>
+              </div>
 
-              <div className="hero-photo-mask">
+              <div className="presentation-photo-frame">
                 <img
-                  src={activeVisual.imageUrl}
-                  alt={activeVisual.title || 'Profesional de la salud'}
-                  className="hero-image"
+                  src={primaryPortrait.imageUrl}
+                  alt={primaryPortrait.title || 'Fotografia principal de la profesional'}
                 />
               </div>
+            </article>
+
+            <div className="presentation-photo-note is-top">
+              <span className="flow-label">Ideal para</span>
+              <strong>Mostrar a la profesional con una imagen propia y actualizable</strong>
             </div>
 
-            <div className="hero-note hero-note-top">
-              <span>Visual activo</span>
-              <strong>{activeVisual.title || 'Presentacion principal'}</strong>
+            <div className="presentation-photo-note is-bottom">
+              <span className="flow-label">Mensaje</span>
+              <strong>{truncateText(aboutSupport, 88)}</strong>
             </div>
 
-            <div className="hero-note hero-note-bottom">
-              <span>{activeVisual.description || activeVariant.note}</span>
-            </div>
-          </div>
-        </div>
-      </section>
+            {portraitHighlights.length ? (
+              <div className="presentation-photo-rail" aria-label="Imagenes secundarias">
+                {portraitHighlights.map((item) => (
+                  <article key={item.id} className="presentation-photo-thumb">
+                    <img src={item.imageUrl} alt={item.title || 'Visual secundario'} />
 
-      <section className="flow-section section-shell">
-        <div className="flow-block">
-          <span className="flow-label">Paginas</span>
-          <div className="flow-links">
-            {sectionLinks.map((link) => (
-              <Link key={link.to} to={link.to} className="flow-link">
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="flow-block">
-          <span className="flow-label">Servicios</span>
-          <div className="service-line">
-            {(content.services || []).map((service) => (
-              <span key={service.id} className="service-chip">
-                {service.title}
-              </span>
-            ))}
+                    <div>
+                      <strong>{item.title || 'Visual secundario'}</strong>
+                      <span>{truncateText(item.description || aboutLead, 60)}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
